@@ -1,0 +1,169 @@
+.app-page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 16px;
+  color: #17212b;
+  font-family: Arial, sans-serif;
+}
+
+.app-header h1 {
+  margin: 0 0 6px;
+  font-size: 30px;
+}
+
+.app-header p {
+  margin: 0 0 16px;
+  color: #4a5967;
+}
+
+.app-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.app-kpis article {
+  background: #f4f8ff;
+  border: 1px solid #dce7f7;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.app-kpis h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  text-transform: uppercase;
+  color: #5c6a79;
+}
+
+.app-kpis strong {
+  font-size: 24px;
+}
+
+.app-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.tab-button {
+  border: 1px solid #7c8a99;
+  background: #ffffff;
+}
+
+.tab-button.active {
+  background: #24323f;
+  color: #ffffff;
+}
+
+.status {
+  border-radius: 6px;
+  padding: 10px;
+  margin: 8px 0;
+}
+
+.status.success {
+  background: #e9fff0;
+  border: 1px solid #a7ddb4;
+}
+
+.status.error {
+  background: #fff0f0;
+  border: 1px solid #efb4b4;
+}
+
+.error-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.timestamp {
+  color: #647282;
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+
+.app-main {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.panel {
+  background: #ffffff;
+  border: 1px solid #d8e1ec;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.app-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.app-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.app-form input,
+.app-form select,
+button {
+  border: 1px solid #99a6b2;
+  border-radius: 4px;
+  padding: 8px;
+}
+
+.form-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  grid-column: 1 / -1;
+}
+
+.filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  border: 1px solid #d4dde8;
+  padding: 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  background: #eef3fa;
+}
+
+@media (max-width: 800px) {
+  .app-kpis,
+  .app-form,
+  .filters {
+    grid-template-columns: 1fr;
+  }
+}
