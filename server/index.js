@@ -60,6 +60,31 @@ db.serialize(() => {
       created_at    TEXT    DEFAULT CURRENT_TIMESTAMP
     );
   `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS orders (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      total_amount REAL    NOT NULL,
+      item_count   INTEGER NOT NULL,
+      created_at   TEXT default CURRENT_TIMESTAMP
+    );
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS order_items (
+      id                 INTEGER PRIMARY KEY autoincrement,
+      order_id           INTEGER NOT NULL REFERENCES orders ON DELETE CASCADE,
+      product_id         INTEGER NOT NULL,
+      product_variant_id INTEGER NOT NULL,
+      product_name       TEXT    NOT NULL,
+      configuration      TEXT    NOT NULL,
+      sku                TEXT    NOT NULL,
+      unit_price         REAL    NOT NULL,
+      quantity           INTEGER NOT NULL,
+      line_total         REAL    NOT NULL,
+      created_at         TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
 });
 
 app.get("/api/health", (req, res) => {
@@ -508,6 +533,46 @@ app.get("/api/products", (req, res) => {
     });
 
     res.json(Object.values(productsMap));
+  });
+});
+
+app.get("/api/orders", (req, res) => {
+  const sql = `
+    SELECT 
+        o.id as order_id, o.total_amount, o.item_count, o.created_at as order_date,
+        i.id as item_id, i.product_name, i.configuration, i.sku, i.unit_price, i.quantity, i.line_total
+    FROM orders o
+    LEFT JOIN order_items i ON o.id = i.order_id
+    ORDER BY o.created_at DESC;
+  `;
+
+  db.all(sql, [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+
+    const ordersMap = {};
+    rows.forEach((row) => {
+      if (!ordersMap[row.order_id]) {
+        ordersMap[row.order_id] = {
+          id: row.order_id,
+          total_amount: row.total_amount,
+          item_count: row.item_count,
+          created_at: row.order_date,
+          items: []
+        };
+      }
+      if (row.item_id) {
+        ordersMap[row.order_id].items.push({
+          id: row.item_id,
+          product_name: row.product_name,
+          configuration: row.configuration,
+          sku: row.sku,
+          unit_price: row.unit_price,
+          quantity: row.quantity,
+          line_total: row.line_total
+        });
+      }
+    });
+    res.json(Object.values(ordersMap));
   });
 });
 

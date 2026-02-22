@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import "./App.css";
-import Catalog from "./tabs/Catalog";
 import Catalog from "./tabs/catalog/Catalog";
+import Orders from "./tabs/orders/Orders";
 
 const DEFAULT_EMPLOYEE_FORM = { name: "", role: "" };
 const DEFAULT_DEVICE_FORM = { name: "", type: "Laptop", ownerId: "" };
@@ -9,6 +9,7 @@ const AVAILABLE_TABS = [
   {id: "devices", name: "Devices"},
   {id: "employees", name: "Employees"},
   {id: "catalog", name: "Catalog"},
+  {id: "orders", name: "Orders"},
 ]
 
 function App() {
@@ -767,6 +768,10 @@ function App() {
 
         {activeTab === "catalog" && (
           <Catalog />
+        )}
+
+        {activeTab === "orders" && (
+          <Orders />
         )}
       </main>
     </div>
