@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import "./App.css";
+import CatalogPage from "./features/catalog/CatalogPage";
+import { useProducts } from "./features/catalog/useProducts";
+import CartSidebar from "./features/cart/CartSidebar";
+import { useCart } from "./features/cart/useCart";
+import OrdersPage from "./features/orders/OrdersPage";
+import { useOrders } from "./features/orders/useOrders";
 
 const DEFAULT_EMPLOYEE_FORM = { name: "", role: "" };
 const DEFAULT_DEVICE_FORM = { name: "", type: "Laptop", ownerId: "" };
@@ -31,6 +37,10 @@ function App() {
   const [ownerNameById, setOwnerNameById] = useState({});
   const [loadingOwnerNames, setLoadingOwnerNames] = useState(false);
   const [lastRefreshAt, setLastRefreshAt] = useState("");
+
+  const productsApi = useProducts();
+  const ordersApi = useOrders();
+  const { cart, addToCart, updateQuantity, removeLine, clearCart } = useCart();
 
   const roleOptions = useMemo(() => {
     const set = new Set();
@@ -73,9 +83,9 @@ function App() {
       setDeviceOwnerFilter(savedOwnerFilter);
     }
 
-    if (hash === "employees" || hash === "devices") {
+    if (hash === "employees" || hash === "devices" || hash === "catalog" || hash === "orders") {
       setActiveTab(hash);
-    } else if (savedTab === "employees" || savedTab === "devices") {
+    } else if (savedTab === "employees" || savedTab === "devices" || savedTab === "catalog" || savedTab === "orders") {
       setActiveTab(savedTab);
     }
   }, []);
@@ -272,6 +282,24 @@ function App() {
     }
   }
 
+  function handleAddToCart(productId, quantity = 1) {
+    const product = productsApi.products.find((p) => p.id === productId);
+    if (!product) return;
+    addToCart(product, quantity);
+  }
+
+  async function handleCreateOrder() {
+    if (cart.length === 0) return;
+    setErrors([]);
+    try {
+      await ordersApi.createOrder(cart);
+      clearCart();
+      setStatusMessage("Order created");
+    } catch (error) {
+      setErrors((prev) => [...prev, `Order failed: ${error.message}`]);
+    }
+  }
+
   async function submitEmployee(event) {
     event.preventDefault();
 
@@ -462,10 +490,30 @@ function App() {
           Devices
         </button>
         <button
+          className={
+            activeTab === "catalog" ? "tab-button active" : "tab-button"
+          }
+          onClick={() => setActiveTab("catalog")}
+          type="button"
+        >
+          Catalog
+        </button>
+        <button
+          className={
+            activeTab === "orders" ? "tab-button active" : "tab-button"
+          }
+          onClick={() => setActiveTab("orders")}
+          type="button"
+        >
+          Orders
+        </button>
+        <button
           type="button"
           onClick={() => {
             fetchEmployees();
             fetchDevices();
+            productsApi.refetch();
+            ordersApi.refetch();
           }}
         >
           Manual refresh
@@ -757,6 +805,29 @@ function App() {
               </tbody>
             </table>
           </section>
+        ) : null}
+
+        {activeTab === "catalog" ? (
+          <div className="catalog-layout">
+            <CatalogPage
+              products={productsApi.products}
+              loading={productsApi.loading}
+              error={productsApi.error}
+              onAddToCart={handleAddToCart}
+            />
+            <CartSidebar
+              cart={cart}
+              products={productsApi.products}
+              onUpdateQuantity={updateQuantity}
+              onRemoveLine={removeLine}
+              onCreateOrder={handleCreateOrder}
+              creating={ordersApi.creating}
+            />
+          </div>
+        ) : null}
+
+        {activeTab === "orders" ? (
+          <OrdersPage orders={ordersApi.orders} loading={ordersApi.loading} />
         ) : null}
       </main>
     </div>

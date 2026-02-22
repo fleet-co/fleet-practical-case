@@ -38,11 +38,55 @@ db.serialize(() => {
       FOREIGN KEY (owner_id) REFERENCES employees(id) ON DELETE SET NULL
     )
   `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS products (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      price REAL NOT NULL,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS orders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS order_product (
+      order_id INTEGER NOT NULL,
+      product_id INTEGER NOT NULL,
+      quantity INTEGER NOT NULL,
+      unit_price REAL,
+      PRIMARY KEY (order_id, product_id),
+      FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+      FOREIGN KEY (product_id) REFERENCES products(id)
+    )
+  `);
+
+  db.run(`
+    INSERT INTO products (name, price)
+    SELECT 'Wireless Headphones', 49.99
+    WHERE (SELECT COUNT(*) FROM products) = 0
+    UNION ALL SELECT 'USB-C Hub', 34.50
+    WHERE (SELECT COUNT(*) FROM products) = 0
+    UNION ALL SELECT 'Mechanical Keyboard', 89.00
+    WHERE (SELECT COUNT(*) FROM products) = 0
+  `);
 });
 
 app.get("/api/health", (req, res) => {
   res.json({ ok: true, timestamp: new Date().toISOString() });
 });
+
+const catalogRouter = require("./catalog/catalog.routes")(db);
+app.use("/api", catalogRouter);
+
+const ordersRouter = require("./orders/orders.routes")(db);
+app.use("/api", ordersRouter);
 
 app.get("/api/employees", (req, res) => {
   const role = req.query.role || "";
