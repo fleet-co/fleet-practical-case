@@ -56,6 +56,16 @@ function Catalog() {
             <h4>Subtotal</h4>
             {formatPrice(cartViewModel.subtotal)}
           </div>
+          <div>
+            <button
+              type="button"
+              onClick={cartViewModel.checkout}
+              disabled={cartViewModel.isCartEmpty || cartViewModel.isSubmitting}
+              style={{ padding: "10px", width: "100%", cursor: "pointer" }}
+            >
+              {cartViewModel.isSubmitting ? "Processing..." : "Checkout"}
+            </button>
+          </div>
         </div>
 
         <div className={styles.catalog}>

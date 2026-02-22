@@ -576,6 +576,69 @@ app.get("/api/orders", (req, res) => {
   });
 });
 
+app.post("/api/orders", (req, res) => {
+  const { items, total_amount, item_count } = req.body;
+
+  if (!items || items.length === 0) {
+    return res.status(400).json({ error: "Cart is empty" });
+  }
+
+  db.serialize(() => {
+    db.run("BEGIN TRANSACTION");
+
+    db.run(
+      `INSERT INTO orders (total_amount, item_count) VALUES (?, ?)`,
+      [total_amount, item_count],
+      function (err) {
+        if (err) {
+          db.run("ROLLBACK");
+          return res.status(500).json({ error: "Failed to create order" });
+        }
+
+        const orderId = this.lastID;
+        let pendingItems = items.length;
+        let hasError = false;
+
+        items.forEach((item) => {
+          db.run(
+            `INSERT INTO order_items (
+              order_id, product_id, product_variant_id, product_name, 
+              configuration, sku, unit_price, quantity, line_total
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              orderId, item.product_id, item.variant_id, item.name,
+              JSON.stringify(item.configuration || {}), item.sku,
+              item.unitPrice, item.quantity, item.quantity * item.unitPrice
+            ],
+            (err) => {
+              if (err) hasError = true;
+            }
+          );
+
+          db.run(
+            `UPDATE product_variants SET stock = stock - ? WHERE id = ?`,
+            [item.quantity, item.variant_id],
+            (err) => {
+              if (err) hasError = true;
+
+              pendingItems--;
+              if (pendingItems === 0) {
+                if (hasError) {
+                  db.run("ROLLBACK");
+                  res.status(500).json({ error: "Failed to process items or stock" });
+                } else {
+                  db.run("COMMIT");
+                  res.status(201).json({ success: true, orderId });
+                }
+              }
+            }
+          );
+        });
+      }
+    );
+  });
+});
+
 app.listen(PORT, () => {
   console.log(`API running on http://localhost:${PORT}`);
 });

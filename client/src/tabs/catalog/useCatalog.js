@@ -27,19 +27,16 @@ function useCatalog() {
           setHasError(false);
 
           const flattenedCatalog = data.flatMap(product => {
-            if (!product.variants || product.variants.length === 0) {
-              return [{
-                id: `p-${product.id}`,
-                name: product.name,
-                price: product.base_price
-              }];
-            }
+            if (!product.variants || product.variants.length === 0) return [];
 
             return product.variants.map(variant => ({
               id: variant.id,
+              product_id: product.id,
+              variant_id: variant.id,
               name: `${product.name} (${variant.configuration})`,
               price: product.base_price + variant.price_delta,
-              sku: variant.sku
+              sku: variant.sku,
+              configuration: variant.configuration,
             }));
           });
 
@@ -95,10 +92,43 @@ export function useCatalogViewModel() {
 
 export function useCartViewModel() {
   const [cart, setCart] = useState([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const subtotal = cart.reduce((acc, cur) => acc + cur.quantity * cur.unitPrice, 0);
+  const itemCount = cart.reduce((acc, cur) => acc + cur.quantity, 0);
+
+  const checkout = async () => {
+    setIsSubmitting(true);
+    try {
+      const response = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: cart,
+          total_amount: subtotal,
+          item_count: itemCount
+        })
+      });
+
+      if (response.ok) {
+        alert("Order placed successfully!");
+        setCart([]); // Clear cart
+      } else {
+        alert("Failed to place order.");
+      }
+    } catch (error) {
+      alert("Error placing order.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return {
     isCartEmpty: cart.length === 0,
     cart,
+    subtotal,
+    isSubmitting,
+    checkout,
     addProductToCart: (product) => {
       setCart((prevState) => {
         const existing = prevState.find((v) => v.id === product.id);
@@ -133,6 +163,5 @@ export function useCartViewModel() {
     removeAllFromCart: (product) => {
       setCart((prevState) => prevState.filter((v) => v.id !== product.id));
     },
-    subtotal: cart.reduce((acc, cur) => acc + (cur.quantity * cur.unitPrice), 0),
   };
 }
