@@ -38,6 +38,28 @@ db.serialize(() => {
       FOREIGN KEY (owner_id) REFERENCES employees(id) ON DELETE SET NULL
     )
   `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS products (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      name       TEXT NOT NULL,
+      status     TEXT NOT NULL,
+      base_price REAL NOT NULL,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS product_variants (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      product_id    INTEGER           NOT NULL REFERENCES products ON DELETE CASCADE,
+      configuration TEXT              NOT NULL,
+      sku           TEXT              NOT NULL UNIQUE,
+      price_delta   REAL    DEFAULT 0 NOT NULL,
+      stock         INTEGER DEFAULT 0 NOT NULL,
+      created_at    TEXT    DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
 });
 
 app.get("/api/health", (req, res) => {
@@ -442,6 +464,51 @@ app.delete("/api/devices/:id", (req, res) => {
       res.json({ success: true });
     },
   );
+});
+
+app.get("/api/products", (req, res) => {
+  const sql = `
+    SELECT 
+        p.id as product_id, p.name, p.status, p.base_price, p.created_at as p_created_at,
+        v.id as variant_id, v.configuration, v.sku, v.price_delta, v.stock
+    FROM products p
+    LEFT JOIN product_variants v ON p.id = v.product_id
+    ORDER BY p.id;
+  `;
+
+  db.all(sql, [], (err, rows) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+
+    const productsMap = {};
+
+    rows.forEach((row) => {
+      if (!productsMap[row.product_id]) {
+        productsMap[row.product_id] = {
+          id: row.product_id,
+          name: row.name,
+          status: row.status,
+          base_price: row.base_price,
+          created_at: row.p_created_at,
+          variants: []
+        };
+      }
+
+      if (row.variant_id) {
+        productsMap[row.product_id].variants.push({
+          id: row.variant_id,
+          configuration: row.configuration,
+          sku: row.sku,
+          price_delta: row.price_delta,
+          stock: row.stock,
+          total_price: row.base_price + row.price_delta
+        });
+      }
+    });
+
+    res.json(Object.values(productsMap));
+  });
 });
 
 app.listen(PORT, () => {

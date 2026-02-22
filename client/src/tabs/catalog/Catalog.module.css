@@ -1,0 +1,13 @@
+.withSidebar {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 14px;
+}
+
+.cartSidebar {
+
+}
+
+.catalog {
+    width: 100%;
+}

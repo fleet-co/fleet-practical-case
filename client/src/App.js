@@ -1,8 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import "./App.css";
+import Catalog from "./tabs/Catalog";
+import Catalog from "./tabs/catalog/Catalog";
 
 const DEFAULT_EMPLOYEE_FORM = { name: "", role: "" };
 const DEFAULT_DEVICE_FORM = { name: "", type: "Laptop", ownerId: "" };
+const AVAILABLE_TABS = [
+  {id: "devices", name: "Devices"},
+  {id: "employees", name: "Employees"},
+  {id: "catalog", name: "Catalog"},
+]
 
 function App() {
   const [activeTab, setActiveTab] = useState("employees");
@@ -73,9 +80,9 @@ function App() {
       setDeviceOwnerFilter(savedOwnerFilter);
     }
 
-    if (hash === "employees" || hash === "devices") {
+    if (AVAILABLE_TABS.find((value) => value.id === hash) !== undefined) {
       setActiveTab(hash);
-    } else if (savedTab === "employees" || savedTab === "devices") {
+    } else if (AVAILABLE_TABS.find((value) => value.id === savedTab) !== undefined) {
       setActiveTab(savedTab);
     }
   }, []);
@@ -449,24 +456,17 @@ function App() {
       </section>
 
       <div className="app-controls">
-        <button
-          className={
-            activeTab === "employees" ? "tab-button active" : "tab-button"
-          }
-          onClick={() => setActiveTab("employees")}
-          type="button"
-        >
-          Employees
-        </button>
-        <button
-          className={
-            activeTab === "devices" ? "tab-button active" : "tab-button"
-          }
-          onClick={() => setActiveTab("devices")}
-          type="button"
-        >
-          Devices
-        </button>
+        {AVAILABLE_TABS.map(({id, name}) => (
+          <button
+            className={
+              activeTab === id ? "tab-button active" : "tab-button"
+            }
+            onClick={() => setActiveTab(id)}
+            type="button"
+          >
+            {name}
+          </button>
+        ))}
         <button
           type="button"
           onClick={() => {
@@ -764,6 +764,10 @@ function App() {
             </table>
           </section>
         ) : null}
+
+        {activeTab === "catalog" && (
+          <Catalog />
+        )}
       </main>
     </div>
   );
