@@ -34,8 +34,6 @@ function App() {
     totalDevices: 0,
     assignedDevices: 0,
   });
-  const [ownerNameById, setOwnerNameById] = useState({});
-  const [loadingOwnerNames, setLoadingOwnerNames] = useState(false);
   const [lastRefreshAt, setLastRefreshAt] = useState("");
 
   const productsApi = useProducts();
@@ -61,6 +59,14 @@ function App() {
     });
     return Array.from(set);
   }, [devices]);
+
+  const ownerNameById = useMemo(() => {
+    const map = {};
+    employees.forEach((e) => {
+      if (e.id != null) map[String(e.id)] = e.name ?? "";
+    });
+    return map;
+  }, [employees]);
 
   useEffect(() => {
     const savedTab = window.localStorage.getItem("fleet_active_tab");
@@ -111,68 +117,6 @@ function App() {
     fetchEmployees();
     fetchDevices();
   }, []);
-
-  useEffect(() => {
-    if (activeTab !== "devices") {
-      return;
-    }
-
-    const ownerIds = Array.from(
-      new Set(
-        filteredDevices
-          .map((device) => Number(device.owner_id))
-          .filter((ownerId) => Number.isInteger(ownerId) && ownerId > 0),
-      ),
-    );
-
-    if (ownerIds.length === 0) {
-      setOwnerNameById({});
-      return;
-    }
-
-    setLoadingOwnerNames(true);
-    setOwnerNameById({});
-
-    Promise.all(
-      ownerIds.map(async (ownerId) => {
-        try {
-          const response = await fetch(`/api/employees/${ownerId}`);
-
-          if (response.status === 404) {
-            return {
-              ownerId: String(ownerId),
-              ownerName: `Unknown employee #${ownerId}`,
-            };
-          }
-
-          if (!response.ok) {
-            throw new Error(`Failed to resolve owner ${ownerId}`);
-          }
-
-          const json = await response.json();
-          return {
-            ownerId: String(ownerId),
-            ownerName: json.name,
-          };
-        } catch (error) {
-          return {
-            ownerId: String(ownerId),
-            ownerName: `Unknown employee #${ownerId}`,
-          };
-        }
-      }),
-    )
-      .then((resolvedOwners) => {
-        const ownerMap = {};
-        resolvedOwners.forEach((owner) => {
-          ownerMap[owner.ownerId] = owner.ownerName;
-        });
-        setOwnerNameById(ownerMap);
-      })
-      .finally(() => {
-        setLoadingOwnerNames(false);
-      });
-  }, [filteredDevices, activeTab]);
 
   useEffect(() => {
     let nextEmployees = [...employees];
@@ -762,8 +706,7 @@ function App() {
             </div>
 
             <h3>
-              Device list {loadingDevices ? "(loading...)" : ""}{" "}
-              {loadingOwnerNames ? "(resolving owners...)" : ""}
+              Device list {loadingDevices ? "(loading...)" : ""}
             </h3>
             <table>
               <thead>
