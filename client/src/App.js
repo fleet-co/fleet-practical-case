@@ -357,6 +357,12 @@ function App() {
       }
       setStatusMessage("Employee deleted");
       await fetchEmployees();
+      setDevices((prevState) => prevState.map((device) => {
+        if (device.owner_id === employeeId) {
+          return {...device, owner_id: null};
+        }
+        return device;
+      }));
     } catch (error) {
       setErrors((prev) => [
         ...prev,
