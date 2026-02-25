@@ -38,6 +38,15 @@ db.serialize(() => {
       FOREIGN KEY (owner_id) REFERENCES employees(id) ON DELETE SET NULL
     )
   `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS orders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      total_amount REAL NOT NULL,
+      item_count INTEGER NOT NULL,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
 });
 
 app.get("/api/health", (req, res) => {
@@ -440,6 +449,119 @@ app.delete("/api/devices/:id", (req, res) => {
         return res.status(404).json({ message: "Device not found" });
       }
       res.json({ success: true });
+    },
+  );
+});
+
+app.get("/api/products", (req, res) => {
+  const search = req.query.search || "";
+  let sql = `
+    SELECT
+      p.id,
+      pv.id AS variant_id,
+      p.name,
+      p.status,
+      p.base_price,
+      p.created_at,
+      pv.configuration,
+      pv.sku,
+      pv.stock,
+      pv.price_delta
+    FROM product_variants pv
+    INNER JOIN products p ON pv.product_id = p.id
+    WHERE p.status = 'active'
+  `;
+  const params = [];
+
+  if (search) {
+    sql += " AND (LOWER(p.name) LIKE ? OR CAST((COALESCE(p.base_price, 0) + COALESCE(pv.price_delta, 0)) AS TEXT) LIKE ? OR LOWER(pv.configuration) LIKE ?)";
+    params.push(`%${search.toLowerCase()}%`);
+    params.push(`%${search.toLowerCase()}%`);
+    params.push(`%${search.toLowerCase()}%`);
+  }
+
+  sql += " ORDER BY p.id DESC, pv.id DESC";
+
+  db.all(sql, params, (err, rows) => {
+    if (err) {
+      return res
+        .status(500)
+        .json({ message: "Failed to fetch products", detail: err.message });
+    }
+    if (rows) {
+      rows = rows.map((row) => ({
+        ...row,
+        price: Number(row.base_price || 0) + Number(row.price_delta || 0),
+        stock: Number(row.stock || 0),
+      }));
+    }
+    res.json(rows);
+  });
+});
+
+app.get("/api/orders", (req, res) => {
+  const search = req.query.search || "";
+  let sql = `
+    SELECT
+      o.id,
+      o.total_amount,
+      o.item_count,
+      o.created_at
+    FROM orders o
+    WHERE 1 = 1
+  `;
+  const params = [];
+
+  if (search) {
+    sql += " AND (CAST(o.total_amount AS TEXT) LIKE ? OR CAST(o.item_count AS TEXT) LIKE ?)";
+    params.push(`%${search.toLowerCase()}%`);
+    params.push(`%${search.toLowerCase()}%`);
+  }
+
+  sql += " GROUP BY o.id ORDER BY o.id DESC";
+
+  db.all(sql, params, (err, rows) => {
+    if (err) {
+      return res
+        .status(500)
+        .json({ message: "Failed to fetch orders", detail: err.message });
+    }
+    res.json(rows);
+  });
+});
+
+app.post("/api/orders", (req, res) => {
+  const payload = req.body || {};
+  const totalAmount = Number(payload.totalAmount);
+  const itemCount = Number(payload.itemCount);
+
+  if (!totalAmount || !itemCount) {
+    return res.status(400).json({ message: "Both total amount and item count are required" });
+  }
+
+  db.run(
+    "INSERT INTO orders (total_amount, item_count) VALUES (?, ?)",
+    [totalAmount, itemCount],
+    function onInsert(err) {
+      if (err) {
+        return res
+          .status(500)
+          .json({ message: "Failed to create order", detail: err.message });
+      }
+
+      db.get(
+        "SELECT id, total_amount, item_count, created_at FROM orders WHERE id = ?",
+        [this.lastID],
+        (fetchErr, row) => {
+          if (fetchErr) {
+            return res
+              .status(500)
+              .json({ message: "Order created but failed to fetch it" });
+          }
+
+          return res.status(201).json(row);
+        },
+      );
     },
   );
 });
