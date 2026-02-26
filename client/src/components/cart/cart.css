@@ -1,20 +1,91 @@
+/* Style pour la sidebar */
 .sidebar {
     position: fixed;
     top: 0;
-    right: -350px;
-    width: 350px;
+    right: -300px;
+    width: 300px;
     height: 100vh;
     background-color: #f8f9fa;
     border-left: 1px solid #ddd;
     transition: right 0.3s ease;
     z-index: 1000;
     box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    box-sizing: border-box;
 }
 
 .sidebar.open {
     right: 0;
 }
 
+.sidebar-content {
+    height: 100%;
+    overflow-y: auto;
+}
+
+.sidebar-content h2 {
+    margin-top: 0;
+    font-size: 18px;
+    color: #333;
+}
+
+/* Style pour la liste des items */
+.cart-items {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+/* Style pour chaque carte d'item */
+.cart-item-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background-color: #fff;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.cart-item-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
+}
+
+/* Style pour les infos de l'item */
+.cart-item-info h5 {
+    margin: 0 0 5px 0;
+    font-size: 16px;
+    color: #333;
+}
+
+.cart-item-price {
+    margin: 0;
+    font-size: 16px;
+    font-weight: bold;
+    color: #2a6496;
+}
+
+/* Style pour le bouton de suppression */
+.cart-item-remove {
+    background: none;
+    border: none;
+    color: #e74c3c;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+}
+
+.cart-item-remove:hover {
+    background-color: #fadbd8;
+}
+
+/* Style pour le bouton d'ouverture/fermeture */
 .toggle-sidebar-button {
     position: fixed;
     top: 20px;
@@ -33,5 +104,5 @@
 }
 
 .toggle-sidebar-button.open {
-    right: 355px;
+    right: 310px;
 }
