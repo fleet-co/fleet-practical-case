@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import Catalog from "./components/catalog/catalog";
 import "./App.css";
 
@@ -32,6 +32,8 @@ function App() {
   const [ownerNameById, setOwnerNameById] = useState({});
   const [loadingOwnerNames, setLoadingOwnerNames] = useState(false);
   const [lastRefreshAt, setLastRefreshAt] = useState("");
+
+  const catalogRef = useRef();
 
   const roleOptions = useMemo(() => {
     const set = new Set();
@@ -475,6 +477,9 @@ function App() {
           onClick={() => {
             fetchEmployees();
             fetchDevices();
+            if (catalogRef.current) {
+              catalogRef.current.refreshProducts();
+            }
           }}
         >
           Manual refresh
@@ -768,7 +773,7 @@ function App() {
           </section>
         ) : null}
 
-        {activeTab === "catalog" ? <Catalog /> : null}
+        {activeTab === "catalog" ? <Catalog ref={catalogRef}/> : null}
       </main>
     </div>
   );

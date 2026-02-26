@@ -48,6 +48,19 @@ db.serialize(() => {
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS product_variants (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      product_id INTEGER NOT NULL,
+      sku TEXT NOT NULL,
+      configuration TEXT,
+      price_delta REAL DEFAULT 0,
+      stock INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+    )
+  `);
 });
 
 app.get("/api/health", (req, res) => {
@@ -457,13 +470,18 @@ app.delete("/api/devices/:id", (req, res) => {
 app.get("/api/products", (req, res) => {
   let sql = `
     SELECT
-      id,
-      name,
-      status,
-      base_price,
-      created_at
-    FROM products
-    ORDER BY id DESC
+      pv.id,
+      p.name,
+      (p.base_price + pv.price_delta) AS price,
+      p.created_at,
+      pv.sku,
+      pv.configuration,
+      pv.stock
+    FROM products p
+    JOIN product_variants pv ON pv.product_id = p.id
+    WHERE p.status = 'active'
+    AND pv.stock > 0
+    ORDER BY pv.id DESC;
   `;
 
   db.all(sql, [], (err, rows) => {
