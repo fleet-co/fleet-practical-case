@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import Catalog from "./components/catalog/catalog";
+import Orders from "./components/orders/orders";
 import "./App.css";
 
 const DEFAULT_EMPLOYEE_FORM = { name: "", role: "" };
@@ -473,6 +474,14 @@ function App() {
           Catalog
         </button>
         <button
+          className={
+            activeTab === "orders" ? "tab-button active" : "tab-button"
+          }
+          onClick={() => setActiveTab("orders")}
+        >
+          Orders
+        </button>
+        <button
           type="button"
           onClick={() => {
             fetchEmployees();
@@ -777,6 +786,10 @@ function App() {
           <>
             <Catalog ref={catalogRef} setErrors={setErrors} />
           </> : null}
+
+        {activeTab === "orders" ?
+          <Orders />
+          : null}
       </main>
     </div>
   );
