@@ -27,6 +27,10 @@ const Cart = forwardRef((props, ref) => {
         getCartItems: () => cartItems,
     }));
 
+    function handleCheckout(cartItems) {
+        alert("Checkout functionality is not implemented yet.");
+    }
+
     return (
         <>
             <div className={`sidebar ${isOpenState ? "open" : ""}`}>
@@ -35,21 +39,33 @@ const Cart = forwardRef((props, ref) => {
                     {cartItems.length === 0 ? (
                         <p>Your cart is empty.</p>
                     ) : (
-                        <div className="cart-items">
-                            {cartItems.map((item, index) => (
-                                <div key={index} className="cart-item-card">
-                                    <div className="cart-item-info">
-                                        <h5>{item.name}</h5>
-                                        <p className="cart-item-price">${item.price}</p>
+                        <div className="cart-details">
+                            <div className="cart-items">
+                                {cartItems.map((item, index) => (
+                                    <div key={index} className="cart-item-card">
+                                        <div className="cart-item-info">
+                                            <h5>{item.name}</h5>
+                                            <p className="cart-item-price">${item.price}</p>
+                                        </div>
+                                        <div>
+
+                                        </div>
+                                        <button
+                                            className="cart-item-remove"
+                                            onClick={() => removeFromCart(index)}
+                                        >
+                                            ✕
+                                        </button>
                                     </div>
-                                    <button
-                                        className="cart-item-remove"
-                                        onClick={() => removeFromCart(index)}
-                                    >
-                                        ✕
-                                    </button>
-                                </div>
-                            ))}
+                                ))}
+                            </div>
+                            <div className="cart-total">
+                                <h3>
+                                    Total: $
+                                    {cartItems.reduce((total, item) => total + item.price, 0)}
+                                </h3>
+                            </div>
+                            <button className="checkout-button" onClick={() => handleCheckout(cartItems)}>Checkout</button>
                         </div>
                     )}
                 </div>

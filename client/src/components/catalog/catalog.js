@@ -71,7 +71,7 @@ const Catalog = forwardRef((props, ref) => {
                     </tr>
                 </thead>
                 <tbody>
-                    {products.map((product) => (
+                    {products.filter((product) => product.stock > 0).map((product) => (
                         <tr key={product.id}>
                             <td>{product.name}</td>
                             <td>{product.configuration}</td>
