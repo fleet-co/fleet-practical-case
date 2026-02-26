@@ -38,6 +38,16 @@ db.serialize(() => {
       FOREIGN KEY (owner_id) REFERENCES employees(id) ON DELETE SET NULL
     )
   `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS products (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      status TEXT,
+      base_price TEXT NOT NULL,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
 });
 
 app.get("/api/health", (req, res) => {
@@ -442,6 +452,29 @@ app.delete("/api/devices/:id", (req, res) => {
       res.json({ success: true });
     },
   );
+});
+
+app.get("/api/products", (req, res) => {
+  let sql = `
+    SELECT
+      id,
+      name,
+      status,
+      base_price,
+      created_at
+    FROM products
+    ORDER BY id DESC
+  `;
+
+  db.all(sql, [], (err, rows) => {
+    if (err) {
+      return res
+        .status(500)
+        .json({ message: "Failed to fetch products", detail: err.message });
+    }
+    res.json(rows);
+  });
+
 });
 
 app.listen(PORT, () => {
