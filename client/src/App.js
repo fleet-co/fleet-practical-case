@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import Catalog from "./components/catalog/catalog";
 import "./App.css";
+import Cart from "./components/cart/cart";
 
 const DEFAULT_EMPLOYEE_FORM = { name: "", role: "" };
 const DEFAULT_DEVICE_FORM = { name: "", type: "Laptop", ownerId: "" };
@@ -773,7 +774,11 @@ function App() {
           </section>
         ) : null}
 
-        {activeTab === "catalog" ? <Catalog ref={catalogRef}/> : null}
+        {activeTab === "catalog" ? 
+        <>
+          <Cart />
+          <Catalog ref={catalogRef}/>
+        </> : null}
       </main>
     </div>
   );

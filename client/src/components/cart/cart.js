@@ -1,6 +1,21 @@
+import { useState } from "react";
+import "./cart.css";
+
 export default function Cart() {
-    return (<section className="panel">
-        <h2>Cart</h2>
-        <p>This is the cart page.</p>
-    </section>);
+    const [isOpenState, setIsOpenState] = useState(false);
+    return (
+        <>
+            <div className={`sidebar ${isOpenState ? "open" : ""}`}>
+                <div className="sidebar-content">
+                </div>
+            </div>
+            <button
+                className={`toggle-sidebar-button ${isOpenState ? "open" : ""}`}
+                onClick={() => setIsOpenState(!isOpenState)}
+            >
+                {isOpenState ? "✕" : "☰"}
+            </button>
+        </>
+    );
+
 }

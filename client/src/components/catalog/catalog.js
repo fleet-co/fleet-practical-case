@@ -1,27 +1,28 @@
 import { useEffect, useState, useImperativeHandle, forwardRef } from "react";
 import { fetchProducts } from "./catalog.service";
+import Cart from "../cart/cart";
 
 const Catalog = forwardRef((props, ref) => {
     const [products, setProducts] = useState([]);
-
+    
     const refreshProducts = () => {
         fetchProducts()
-            .then((data) => setProducts(data))
-            .catch((error) => console.error("Error fetching products:", error));
+        .then((data) => setProducts(data))
+        .catch((error) => console.error("Error fetching products:", error));
     }
-
+    
     useEffect(() => {
         refreshProducts();
     }, []);
-
+    
     useImperativeHandle(ref, () => ({
         refreshProducts,
     }));
-
+    
     function addToCart(product) {
         console.log("Adding to cart:", product);
     }
-
+    
     return (<section className="panel">
         <h2>Catalog</h2>
         <table>
