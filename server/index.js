@@ -3,6 +3,9 @@ const cors = require("cors");
 const path = require("path");
 const sqlite3 = require("sqlite3").verbose();
 
+const createProductsRouter = require("./routes/products");
+const createOrdersRouter = require("./routes/orders");
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -36,6 +39,32 @@ db.serialize(() => {
       owner_id INTEGER,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (owner_id) REFERENCES employees(id) ON DELETE SET NULL
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS orders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      total_amount REAL NOT NULL,
+      item_count INTEGER NOT NULL,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS order_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_id INTEGER NOT NULL,
+      product_id INTEGER,
+      product_variant_id INTEGER,
+      product_name TEXT,
+      configuration TEXT,
+      sku TEXT,
+      unit_price REAL NOT NULL,
+      quantity INTEGER NOT NULL,
+      line_total REAL NOT NULL,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
     )
   `);
 });
@@ -101,7 +130,7 @@ app.get("/api/employees/:id", (req, res) => {
       if (!row) {
         return res.status(404).json({ message: "Employee not found" });
       }
-      return res.json(row);
+      res.json(row);
     },
   );
 });
@@ -125,7 +154,7 @@ app.post("/api/employees", (req, res) => {
           .json({ message: "Failed to create employee", detail: err.message });
       }
 
-      db.get(
+      return db.get(
         "SELECT id, name, role, created_at FROM employees WHERE id = ?",
         [this.lastID],
         (fetchErr, row) => {
@@ -168,7 +197,7 @@ app.put("/api/employees/:id", (req, res) => {
         return res.status(404).json({ message: "Employee not found" });
       }
 
-      db.get(
+      return db.get(
         "SELECT id, name, role, created_at FROM employees WHERE id = ?",
         [employeeId],
         (fetchErr, row) => {
@@ -443,6 +472,9 @@ app.delete("/api/devices/:id", (req, res) => {
     },
   );
 });
+
+app.use(createProductsRouter(db));
+app.use(createOrdersRouter(db));
 
 app.listen(PORT, () => {
   console.log(`API running on http://localhost:${PORT}`);

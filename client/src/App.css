@@ -143,6 +143,7 @@ button {
   font-size: 13px;
 }
 
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -160,10 +161,15 @@ th {
   background: #eef3fa;
 }
 
+button {
+  cursor: pointer;
+}
+
 @media (max-width: 800px) {
   .app-kpis,
   .app-form,
   .filters {
     grid-template-columns: 1fr;
   }
+
 }
