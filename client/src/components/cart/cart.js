@@ -53,17 +53,18 @@ const Cart = forwardRef((props, ref) => {
                                     <div key={key} className="cart-item-card">
                                         <div className="cart-item-info">
                                             <h5>{item.name}</h5>
-                                            <p className="cart-item-price">${item.price}</p>
+                                            <p>{item.configuration}</p>
+                                            <p className="cart-item-price">${item.price * item.quantity}</p>
                                         </div>
-                                        <div>
+                                        <div className="cart-item-actions">
                                             <div>Quantity: {item.quantity}</div>
+                                            <button
+                                                className="cart-item-remove"
+                                                onClick={() => removeFromCart(key)}
+                                            >
+                                                ✕
+                                            </button>
                                         </div>
-                                        <button
-                                            className="cart-item-remove"
-                                            onClick={() => removeFromCart(key)}
-                                        >
-                                            ✕
-                                        </button>
                                     </div>
                                 ))}
                             </div>

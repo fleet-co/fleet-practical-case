@@ -1,8 +1,8 @@
 .sidebar {
     position: fixed;
     top: 0;
-    right: -300px;
-    width: 300px;
+    right: -420px;
+    width: 420px;
     height: 100vh;
     background-color: #f8f9fa;
     border-left: 1px solid #ddd;
@@ -82,6 +82,12 @@
     color: #2a6496;
 }
 
+.cart-item-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
 .cart-item-remove {
     background: none;
     border: none;
@@ -117,5 +123,5 @@
 }
 
 .toggle-sidebar-button.open {
-    right: 310px;
+    right: 430px;
 }
