@@ -7,6 +7,12 @@ export default function useCatalog(products = []) {
 
 	const handleAddToCart = useCallback((product) => {
 		const unitPrice = Number((product.price ?? product.base_price) || 0);
+		const availableStock = Math.max(0, Number(product.stock || 0));
+
+		if (availableStock <= 0) {
+			return;
+		}
+
 		const cartItemId = product.variant_id
 			? `variant-${product.variant_id}`
 			: `product-${product.id}`;
@@ -31,6 +37,7 @@ export default function useCatalog(products = []) {
 						quantity: 1,
 						totalPrice: unitPrice,
 						unitPrice,
+						availableStock,
 					},
 				];
 			}
@@ -40,11 +47,18 @@ export default function useCatalog(products = []) {
 					return item;
 				}
 
-				const nextQuantity = item.quantity + 1;
+				const maxQuantity = Math.max(0, Number(item.availableStock ?? availableStock));
+				const nextQuantity = Math.min(item.quantity + 1, maxQuantity);
+
+				if (nextQuantity === item.quantity) {
+					return item;
+				}
+
 				return {
 					...item,
 					quantity: nextQuantity,
-					totalPrice: unitPrice * nextQuantity,
+					totalPrice: Number(item.unitPrice || unitPrice) * nextQuantity,
+					availableStock: maxQuantity,
 				};
 			});
 		});
@@ -57,7 +71,13 @@ export default function useCatalog(products = []) {
 					return item;
 				}
 
-				const nextQuantity = item.quantity + 1;
+				const maxQuantity = Math.max(0, Number(item.availableStock ?? 0));
+				const nextQuantity = Math.min(item.quantity + 1, maxQuantity);
+
+				if (nextQuantity === item.quantity) {
+					return item;
+				}
+
 				return {
 					...item,
 					quantity: nextQuantity,

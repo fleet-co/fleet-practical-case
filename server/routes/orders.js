@@ -108,7 +108,21 @@ function createOrdersRouter(db) {
           let remainingInserts = normalizedItems.length;
           let hasFailed = false;
 
-          normalizedItems.forEach((item) => {
+          const failWithRollback = (statusCode, message, detail) => {
+            if (hasFailed) {
+              return;
+            }
+
+            hasFailed = true;
+            return db.run("ROLLBACK", () => {
+              if (detail) {
+                return res.status(statusCode).json({ message, detail });
+              }
+              return res.status(statusCode).json({ message });
+            });
+          };
+
+          const insertOrderItem = (item) => {
             db.run(
               `
               INSERT INTO order_items (
@@ -140,13 +154,7 @@ function createOrdersRouter(db) {
                 }
 
                 if (itemErr) {
-                  hasFailed = true;
-                  return db.run("ROLLBACK", () =>
-                    res.status(500).json({
-                      message: "Failed to create order items",
-                      detail: itemErr.message,
-                    }),
-                  );
+                  return failWithRollback(500, "Failed to create order items", itemErr.message);
                 }
 
                 remainingInserts -= 1;
@@ -177,6 +185,33 @@ function createOrdersRouter(db) {
                     },
                   );
                 });
+              },
+            );
+          };
+
+          normalizedItems.forEach((item) => {
+            if (!item.productVariantId) {
+              insertOrderItem(item);
+              return;
+            }
+
+            db.run(
+              "UPDATE product_variants SET stock = stock - ? WHERE id = ? AND stock >= ?",
+              [item.quantity, item.productVariantId, item.quantity],
+              function onStockUpdate(stockErr) {
+                if (hasFailed) {
+                  return;
+                }
+
+                if (stockErr) {
+                  return failWithRollback(500, "Failed to update product stock", stockErr.message);
+                }
+
+                if (this.changes === 0) {
+                  return failWithRollback(409, "Insufficient stock for one or more products");
+                }
+
+                return insertOrderItem(item);
               },
             );
           });
