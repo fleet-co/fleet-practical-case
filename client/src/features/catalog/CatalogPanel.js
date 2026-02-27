@@ -4,6 +4,7 @@ import { useState } from "react";
 import Table from "../../components/Table";
 import { useMemo } from "react";
 import { useEffect } from "react";
+import { useCallback } from "react";
 import Cart from "../cart/Cart";
 
 export default function CatalogPanel({ products, setStatusMessage, setErrors }) {
@@ -11,7 +12,7 @@ export default function CatalogPanel({ products, setStatusMessage, setErrors }) 
 	const [filteredProducts, setFilteredProducts] = useState([]);
 	const [productSearch, setProductSearch] = useState("");
 
-	function handleAddToCart(product) {
+	const handleAddToCart = useCallback((product) => {
 		const unitPrice = Number((product.price ?? product.base_price) || 0);
 		const cartItemId = product.variant_id
 			? `variant-${product.variant_id}`
@@ -49,7 +50,7 @@ export default function CatalogPanel({ products, setStatusMessage, setErrors }) 
 				};
 			});
 		});
-	}
+	}, []);
 
 	function handleIncreaseQuantity(productId) {
 		setSelectedProducts((previousItems) =>
@@ -138,9 +139,23 @@ export default function CatalogPanel({ products, setStatusMessage, setErrors }) 
 				},
 			},
 			{ key: "price", header: "Price ($)" },
-			{ key: "actions", header: "Actions" },
+			{
+				key: "actions",
+				header: "Actions",
+				render: (row) => {
+					if (Number(row.stock || 0) <= 0) {
+						return null;
+					}
+
+					return (
+						<button type="button" onClick={() => handleAddToCart(row)}>
+							Add to cart
+						</button>
+					);
+				},
+			},
 		],
-		[],
+		[handleAddToCart],
 	);
 
 	return (
@@ -162,8 +177,6 @@ export default function CatalogPanel({ products, setStatusMessage, setErrors }) 
 				<Table
 					columns={productTableColumns}
 					rows={filteredProducts}
-					addToCart={handleAddToCart}
-					addToCartWhen={(row) => Number(row.stock || 0) > 0}
 					emptyMessage="No products found"
 				/>
 			</section>

@@ -566,6 +566,66 @@ app.post("/api/orders", (req, res) => {
   );
 });
 
+app.get("/api/orders/:id", (req, res) => {
+  const orderId = Number(req.params.id);
+  if (!orderId) {
+    return res.status(400).json({ message: "Invalid order id" });
+  }
+
+  db.get(
+    "SELECT id, total_amount, item_count, created_at FROM orders WHERE id = ?",
+    [orderId],
+    (orderErr, orderRow) => {
+      if (orderErr) {
+        return res
+          .status(500)
+          .json({ message: "Failed to fetch order", detail: orderErr.message });
+      }
+
+      if (!orderRow) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      const sql = `
+        SELECT
+          oi.id,
+          oi.order_id,
+          oi.product_id,
+          oi.product_variant_id,
+          COALESCE(p.name, oi.product_name) AS product_name,
+          COALESCE(pv.configuration, oi.configuration) AS configuration,
+          COALESCE(pv.sku, oi.sku) AS sku,
+          oi.unit_price,
+          oi.quantity,
+          oi.line_total,
+          oi.created_at,
+          p.status AS product_status,
+          p.base_price,
+          pv.price_delta,
+          pv.stock
+        FROM order_items oi
+        LEFT JOIN products p ON p.id = oi.product_id
+        LEFT JOIN product_variants pv ON pv.id = oi.product_variant_id
+        WHERE oi.order_id = ?
+        ORDER BY oi.id ASC
+      `;
+
+      db.all(sql, [orderId], (itemsErr, rows) => {
+        if (itemsErr) {
+          return res
+            .status(500)
+            .json({ message: "Failed to fetch order details", detail: itemsErr.message });
+        }
+
+        return res.json({
+          order: orderRow,
+          items: Array.isArray(rows) ? rows : [],
+        });
+      });
+    },
+  );
+});
+
 app.listen(PORT, () => {
   console.log(`API running on http://localhost:${PORT}`);
 });

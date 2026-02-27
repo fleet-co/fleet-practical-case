@@ -4,10 +4,15 @@ import { useState } from "react";
 import Table from "../../components/Table";
 import { useMemo } from "react";
 import { useEffect } from "react";
+import OrderDetails from "./OrderDetails";
 
 export default function OrdersPanel({ orders }) {
     const [filteredOrders, setFilteredOrders] = useState([]);
     const [orderSearch, setOrderSearch] = useState("");
+    const [selectedOrder, setSelectedOrder] = useState(null);
+    const [selectedOrderDetails, setSelectedOrderDetails] = useState([]);
+    const [loadingDetails, setLoadingDetails] = useState(false);
+    const [detailsError, setDetailsError] = useState("");
 
     useEffect(() => {
         let nextOrders = [...orders];
@@ -39,9 +44,49 @@ export default function OrdersPanel({ orders }) {
             { key: "created_at", header: "Date" },
             { key: "total_amount", header: "Total amount ($)" },
             { key: "item_count", header: "Item count" },
+            {
+                key: "actions",
+                header: "Actions",
+                render: (row) => (
+                    <button
+                        type="button"
+                        onClick={() => handleShowDetails(row)}>
+                        Show details
+                    </button>
+                ),
+            },
         ],
         [],
     );
+
+    async function handleShowDetails(order) {
+        setLoadingDetails(true);
+        setDetailsError("");
+
+        try {
+            const response = await fetch(`/api/orders/${order.id}`);
+            const json = await response.json();
+
+            if (!response.ok) {
+                throw new Error(json.message || "Could not load order details");
+            }
+
+            setSelectedOrder(json.order || order);
+            setSelectedOrderDetails(Array.isArray(json.items) ? json.items : []);
+        } catch (error) {
+            setSelectedOrder(order);
+            setSelectedOrderDetails([]);
+            setDetailsError(error.message || "Could not load order details");
+        } finally {
+            setLoadingDetails(false);
+        }
+    }
+
+    function resetOrderDetails() {
+        setSelectedOrder(null);
+        setSelectedOrderDetails([]);
+        setDetailsError("");
+    }
 
     return (
         <div >
@@ -64,6 +109,16 @@ export default function OrdersPanel({ orders }) {
                     rows={filteredOrders}
                     emptyMessage="No orders found"
                 />
+
+                {(selectedOrder || loadingDetails || detailsError) ? (
+                    <OrderDetails
+                        order={selectedOrder}
+                        items={selectedOrderDetails}
+                        loading={loadingDetails}
+                        error={detailsError}
+                        reset={resetOrderDetails}
+                    />
+                ) : null}
             </section>
         </div>
     );

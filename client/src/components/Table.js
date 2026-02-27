@@ -1,10 +1,6 @@
 export default function Table({
 	columns,
 	rows,
-	editItem,
-	deleteItem,
-	addToCart,
-	addToCartWhen,
 	emptyMessage = "No data found",
 }) {
 	return (
@@ -21,25 +17,7 @@ export default function Table({
 					<tr key={row.variant_id ?? row.id ?? index}>
 						{columns.map((column) => (
 							<td key={column.key}>
-								{column.key === "actions" ? (
-									<>
-										{editItem && <button
-											type="button"
-											onClick={() => editItem(row)}>
-											Edit
-										</button>}
-										{deleteItem && <button
-											type="button"
-											onClick={() => deleteItem(row.id)}>
-											Delete
-										</button>}
-										{addToCart && (!addToCartWhen || addToCartWhen(row)) && <button
-											type="button"
-											onClick={() => addToCart(row)}>
-											Add to cart
-										</button>}
-									</>
-								) : column.render ? (
+								{column.render ? (
 									column.render(row)
 								) : (
 									row[column.key]
