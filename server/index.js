@@ -3,6 +3,9 @@ const cors = require("cors");
 const path = require("path");
 const sqlite3 = require("sqlite3").verbose();
 
+const createProductsRouter = require("./routes/products");
+const createOrdersRouter = require("./routes/orders");
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -45,6 +48,23 @@ db.serialize(() => {
       total_amount REAL NOT NULL,
       item_count INTEGER NOT NULL,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS order_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_id INTEGER NOT NULL,
+      product_id INTEGER,
+      product_variant_id INTEGER,
+      product_name TEXT,
+      configuration TEXT,
+      sku TEXT,
+      unit_price REAL NOT NULL,
+      quantity INTEGER NOT NULL,
+      line_total REAL NOT NULL,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
     )
   `);
 });
@@ -110,7 +130,7 @@ app.get("/api/employees/:id", (req, res) => {
       if (!row) {
         return res.status(404).json({ message: "Employee not found" });
       }
-      return res.json(row);
+      res.json(row);
     },
   );
 });
@@ -134,7 +154,7 @@ app.post("/api/employees", (req, res) => {
           .json({ message: "Failed to create employee", detail: err.message });
       }
 
-      db.get(
+      return db.get(
         "SELECT id, name, role, created_at FROM employees WHERE id = ?",
         [this.lastID],
         (fetchErr, row) => {
@@ -177,7 +197,7 @@ app.put("/api/employees/:id", (req, res) => {
         return res.status(404).json({ message: "Employee not found" });
       }
 
-      db.get(
+      return db.get(
         "SELECT id, name, role, created_at FROM employees WHERE id = ?",
         [employeeId],
         (fetchErr, row) => {
@@ -453,178 +473,8 @@ app.delete("/api/devices/:id", (req, res) => {
   );
 });
 
-app.get("/api/products", (req, res) => {
-  const search = req.query.search || "";
-  let sql = `
-    SELECT
-      p.id,
-      pv.id AS variant_id,
-      p.name,
-      p.status,
-      p.base_price,
-      p.created_at,
-      pv.configuration,
-      pv.sku,
-      pv.stock,
-      pv.price_delta
-    FROM product_variants pv
-    INNER JOIN products p ON pv.product_id = p.id
-    WHERE p.status = 'active'
-  `;
-  const params = [];
-
-  if (search) {
-    sql += " AND (LOWER(p.name) LIKE ? OR CAST((COALESCE(p.base_price, 0) + COALESCE(pv.price_delta, 0)) AS TEXT) LIKE ? OR LOWER(pv.configuration) LIKE ?)";
-    params.push(`%${search.toLowerCase()}%`);
-    params.push(`%${search.toLowerCase()}%`);
-    params.push(`%${search.toLowerCase()}%`);
-  }
-
-  sql += " ORDER BY p.id DESC, pv.id DESC";
-
-  db.all(sql, params, (err, rows) => {
-    if (err) {
-      return res
-        .status(500)
-        .json({ message: "Failed to fetch products", detail: err.message });
-    }
-    if (rows) {
-      rows = rows.map((row) => ({
-        ...row,
-        price: Number(row.base_price || 0) + Number(row.price_delta || 0),
-        stock: Number(row.stock || 0),
-      }));
-    }
-    res.json(rows);
-  });
-});
-
-app.get("/api/orders", (req, res) => {
-  const search = req.query.search || "";
-  let sql = `
-    SELECT
-      o.id,
-      o.total_amount,
-      o.item_count,
-      o.created_at
-    FROM orders o
-    WHERE 1 = 1
-  `;
-  const params = [];
-
-  if (search) {
-    sql += " AND (CAST(o.total_amount AS TEXT) LIKE ? OR CAST(o.item_count AS TEXT) LIKE ?)";
-    params.push(`%${search.toLowerCase()}%`);
-    params.push(`%${search.toLowerCase()}%`);
-  }
-
-  sql += " GROUP BY o.id ORDER BY o.id DESC";
-
-  db.all(sql, params, (err, rows) => {
-    if (err) {
-      return res
-        .status(500)
-        .json({ message: "Failed to fetch orders", detail: err.message });
-    }
-    res.json(rows);
-  });
-});
-
-app.post("/api/orders", (req, res) => {
-  const payload = req.body || {};
-  const totalAmount = Number(payload.totalAmount);
-  const itemCount = Number(payload.itemCount);
-
-  if (!totalAmount || !itemCount) {
-    return res.status(400).json({ message: "Both total amount and item count are required" });
-  }
-
-  db.run(
-    "INSERT INTO orders (total_amount, item_count) VALUES (?, ?)",
-    [totalAmount, itemCount],
-    function onInsert(err) {
-      if (err) {
-        return res
-          .status(500)
-          .json({ message: "Failed to create order", detail: err.message });
-      }
-
-      db.get(
-        "SELECT id, total_amount, item_count, created_at FROM orders WHERE id = ?",
-        [this.lastID],
-        (fetchErr, row) => {
-          if (fetchErr) {
-            return res
-              .status(500)
-              .json({ message: "Order created but failed to fetch it" });
-          }
-
-          return res.status(201).json(row);
-        },
-      );
-    },
-  );
-});
-
-app.get("/api/orders/:id", (req, res) => {
-  const orderId = Number(req.params.id);
-  if (!orderId) {
-    return res.status(400).json({ message: "Invalid order id" });
-  }
-
-  db.get(
-    "SELECT id, total_amount, item_count, created_at FROM orders WHERE id = ?",
-    [orderId],
-    (orderErr, orderRow) => {
-      if (orderErr) {
-        return res
-          .status(500)
-          .json({ message: "Failed to fetch order", detail: orderErr.message });
-      }
-
-      if (!orderRow) {
-        return res.status(404).json({ message: "Order not found" });
-      }
-
-      const sql = `
-        SELECT
-          oi.id,
-          oi.order_id,
-          oi.product_id,
-          oi.product_variant_id,
-          COALESCE(p.name, oi.product_name) AS product_name,
-          COALESCE(pv.configuration, oi.configuration) AS configuration,
-          COALESCE(pv.sku, oi.sku) AS sku,
-          oi.unit_price,
-          oi.quantity,
-          oi.line_total,
-          oi.created_at,
-          p.status AS product_status,
-          p.base_price,
-          pv.price_delta,
-          pv.stock
-        FROM order_items oi
-        LEFT JOIN products p ON p.id = oi.product_id
-        LEFT JOIN product_variants pv ON pv.id = oi.product_variant_id
-        WHERE oi.order_id = ?
-        ORDER BY oi.id ASC
-      `;
-
-      db.all(sql, [orderId], (itemsErr, rows) => {
-        if (itemsErr) {
-          return res
-            .status(500)
-            .json({ message: "Failed to fetch order details", detail: itemsErr.message });
-        }
-
-        return res.json({
-          order: orderRow,
-          items: Array.isArray(rows) ? rows : [],
-        });
-      });
-    },
-  );
-});
+app.use(createProductsRouter(db));
+app.use(createOrdersRouter(db));
 
 app.listen(PORT, () => {
   console.log(`API running on http://localhost:${PORT}`);

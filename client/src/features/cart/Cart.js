@@ -1,39 +1,25 @@
+import useCart from "./useCart";
+import "./Cart.css";
+
 export default function Cart({
 	items = [],
 	total,
 	setStatusMessage,
 	setErrors,
 	resetCart,
+	refreshOrders,
 	onIncreaseQuantity,
 	onDecreaseQuantity,
 	onRemoveItem,
 }) {
-	const cartTotal = total ?? items.reduce((sum, item) => sum + Number(item.totalPrice || 0), 0);
-
-	async function submitOrder(event) {
-		event.preventDefault();
-
-		const payload = {
-			totalAmount: cartTotal,
-			itemCount: items.length,
-		};
-
-		try {
-			const response = await fetch("/api/orders", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify(payload),
-			});
-			const json = await response.json();
-			if (!response.ok) {
-				throw new Error(json.message || "Could not save order");
-			}
-			setStatusMessage("Order created");
-			resetCart();
-		} catch (error) {
-			setErrors((prev) => [...prev, `Order save failed: ${error.message}`]);
-		}
-	}
+	const { cartTotal, submitOrder } = useCart({
+		items,
+		total,
+		setStatusMessage,
+		setErrors,
+		resetCart,
+		refreshOrders,
+	});
 
 	return (
 		<section className="cart">
