@@ -498,6 +498,7 @@ app.get("/api/products", (req, res) => {
   let sql = `
     SELECT
       pv.id,
+      p.id AS product_id,
       p.name,
       (p.base_price + pv.price_delta) AS price,
       p.created_at,
@@ -551,45 +552,72 @@ app.get("/api/orders", (req, res) => {
 
 app.post("/api/orders", (req, res) => {
   const payload = req.body || {};
-  const items = payload.items || [];
 
-  console.log("Received order creation request with payload:", payload);
-  console.log("Received order creation request with items:", items);
-
-  if (!Array.isArray(items) || items.length === 0) {
-    return res.status(400).json({ message: "Order must contain at least one item" });
+  if (!req.is("application/json")) {
+    return res.status(400).json({
+      message: "Content-Type must be application/json",
+    });
   }
 
-  const totalAmount = items.reduce((sum, item) => sum + item.line_total, 0);
-  const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
+  if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
+    return res.status(400).json({
+      message: "Payload must be a JSON object",
+    });
+  }
+
+  const orderModel = {
+    total_amount: Object.entries(payload).reduce((sum, [_key, item]) => sum + item.quantity * item.price, 0),
+    item_count: Object.entries(payload).reduce((sum, [_key, item]) => sum + item.quantity, 0),
+  }
+
+  const orderItems = Object.entries(payload).map(([key, item]) => ({
+    product_id: item.product_id,
+    product_variant_id: item.id,
+    product_name: item.name,
+    configuration: item.configuration,
+    sku: item.sku,
+    unit_price: item.price,
+    quantity: item.quantity,
+    line_total: item.price * item.quantity,
+  }));
+
+  const updateProductStock = Object.entries(payload).map(([key, item]) => ({
+    product_variant_id: item.id,
+    quantity: item.quantity,
+  }));
 
   db.serialize(() => {
+    db.run("BEGIN TRANSACTION");
+
     db.run(
       "INSERT INTO orders (total_amount, item_count) VALUES (?, ?)",
-      [totalAmount, itemCount],
+      [orderModel.total_amount, orderModel.item_count],
       function onInsert(err) {
         if (err) {
-          return res
-            .status(500)
-            .json({ message: "Failed to create order", detail: err.message });
+          db.run("ROLLBACK");
+          return res.status(500).json({
+            message: "Failed to create order",
+            detail: err.message,
+          });
         }
 
         const orderId = this.lastID;
-        const stmt = db.prepare(`
-          INSERT INTO order_items (
-            order_id,
-            product_id,
-            product_variant_id,
-            product_name,
-            configuration,
-            sku,
-            unit_price,
-            quantity,
-            line_total
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `);
 
-        for (const item of items) {
+        const stmt = db.prepare(`
+        INSERT INTO order_items (
+          order_id,
+          product_id,
+          product_variant_id,
+          product_name,
+          configuration,
+          sku,
+          unit_price,
+          quantity,
+          line_total
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+        for (const item of orderItems) {
           stmt.run(
             orderId,
             item.product_id,
@@ -605,14 +633,49 @@ app.post("/api/orders", (req, res) => {
 
         stmt.finalize((finalizeErr) => {
           if (finalizeErr) {
+            db.run("ROLLBACK");
             return res.status(500).json({
-              message: "Order created but failed to save items",
+              message: "Failed to save order items",
               detail: finalizeErr.message,
             });
           }
-          res.status(201).json({ order_id: orderId });
+
+          const stockUpdateStmt = db.prepare(`
+          UPDATE product_variants
+          SET stock = stock - ?
+          WHERE id = ?
+        `);
+
+          for (const update of updateProductStock) {
+            stockUpdateStmt.run(
+              update.quantity,
+              update.product_variant_id
+            );
+          }
+
+          stockUpdateStmt.finalize((stockErr) => {
+            if (stockErr) {
+              db.run("ROLLBACK");
+              return res.status(500).json({
+                message: "Failed to update stock",
+                detail: stockErr.message,
+              });
+            }
+
+            db.run("COMMIT", (commitErr) => {
+              if (commitErr) {
+                db.run("ROLLBACK");
+                return res.status(500).json({
+                  message: "Commit failed",
+                  detail: commitErr.message,
+                });
+              }
+
+              res.status(201).json({ order_id: orderId });
+            });
+          });
         });
-      },
+      }
     );
   });
 });

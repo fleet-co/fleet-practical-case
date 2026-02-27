@@ -57,7 +57,7 @@ const Catalog = forwardRef((props, ref) => {
 
     return (
         <section className="panel">
-            <Cart ref={cartRef} addProduct={addProduct} />
+            <Cart ref={cartRef} addProduct={addProduct} setErrors={setErrors} />
             <h2>Catalog</h2>
             <table>
                 <thead>

@@ -8,7 +8,7 @@ const Cart = forwardRef((props, ref) => {
         const savedCart = localStorage.getItem("cartItems");
         return savedCart ? JSON.parse(savedCart) : {};
     });
-    const { addProduct } = props;
+    const { addProduct, setErrors } = props;
 
     useEffect(() => {
         localStorage.setItem("cartItems", JSON.stringify(cartItems));
@@ -34,9 +34,14 @@ const Cart = forwardRef((props, ref) => {
         addToCart
     }));
 
-    function handleCheckout(cartItems) {
-        console.log("Checking out with items:", cartItems);
-        createOrder(cartItems);
+    async function handleOrder(cartItems) {
+        console.log("Ordering with items:", cartItems);
+        try {
+            await createOrder(cartItems);
+            setCartItems({});
+        } catch (error) {
+            setErrors((prev) => [...prev, error.message]);
+        }
     }
 
     return (
@@ -54,7 +59,7 @@ const Cart = forwardRef((props, ref) => {
                                         <div className="cart-item-info">
                                             <h5>{item.name}</h5>
                                             <p>{item.configuration}</p>
-                                            <p className="cart-item-price">${item.price * item.quantity }</p>
+                                            <p className="cart-item-price">${item.price * item.quantity}</p>
                                         </div>
                                         <div className="cart-item-actions">
                                             <div>Quantity: {item.quantity}</div>
@@ -74,7 +79,7 @@ const Cart = forwardRef((props, ref) => {
                                     {Object.values(cartItems).reduce((total, item) => total + (item.price * item.quantity), 0)}
                                 </h3>
                             </div>
-                            <button className="checkout-button" onClick={() => handleCheckout(cartItems)}>Checkout</button>
+                            <button className="checkout-button" onClick={() => handleOrder(cartItems)}>Order</button>
                         </div>
                     )}
                 </div>
