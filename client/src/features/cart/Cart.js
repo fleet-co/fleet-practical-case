@@ -8,6 +8,7 @@ export default function Cart({
 	setErrors,
 	resetCart,
 	refreshOrders,
+	refreshProducts,
 	onIncreaseQuantity,
 	onDecreaseQuantity,
 	onRemoveItem,
@@ -19,6 +20,7 @@ export default function Cart({
 		setErrors,
 		resetCart,
 		refreshOrders,
+		refreshProducts,
 	});
 
 	return (
@@ -40,6 +42,7 @@ export default function Cart({
 							<button
 								type="button"
 								aria-label={`Increase ${item.name}`}
+								disabled={Number(item.quantity || 0) >= Number(item.availableStock || 0)}
 								onClick={() => onIncreaseQuantity?.(item.id)}>
 								+
 							</button>
@@ -62,7 +65,13 @@ export default function Cart({
 			</div>
 
 			{items && items.length > 0 && (
-				<button type="button" className="cart-create-order-button" onClick={submitOrder}>
+				<button
+					type="button"
+					className="cart-create-order-button"
+					onClick={submitOrder}
+					disabled={items.some(
+						(item) => Number(item.quantity || 0) > Number(item.availableStock || 0),
+					)}>
 					Order
 				</button>
 			)}

@@ -5,7 +5,13 @@ import Cart from "../cart/Cart";
 import useCatalog from "./useCatalog";
 import "./CatalogPanel.css";
 
-export default function CatalogPanel({ products, setStatusMessage, setErrors, refreshOrders }) {
+export default function CatalogPanel({
+	products,
+	setStatusMessage,
+	setErrors,
+	refreshOrders,
+	refreshProducts,
+}) {
 	const {
 		productSearch,
 		setProductSearch,
@@ -47,6 +53,7 @@ export default function CatalogPanel({ products, setStatusMessage, setErrors, re
 					setStatusMessage={setStatusMessage}
 					setErrors={setErrors}
 					refreshOrders={refreshOrders}
+					refreshProducts={refreshProducts}
 					onIncreaseQuantity={handleIncreaseQuantity}
 					onDecreaseQuantity={handleDecreaseQuantity}
 					onRemoveItem={handleRemoveFromCart}

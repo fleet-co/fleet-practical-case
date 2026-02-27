@@ -7,14 +7,29 @@ export default function useCart({
 	setErrors,
 	resetCart,
 	refreshOrders,
+	refreshProducts,
 }) {
 	const cartTotal = useMemo(
 		() => total ?? items.reduce((sum, item) => sum + Number(item.totalPrice || 0), 0),
 		[items, total],
 	);
 
+	const hasQuantityOverStock = useMemo(
+		() =>
+			items.some((item) => {
+				const availableStock = Number(item.availableStock ?? 0);
+				return Number(item.quantity || 0) > availableStock;
+			}),
+		[items],
+	);
+
 	async function submitOrder(event) {
 		event.preventDefault();
+
+		if (hasQuantityOverStock) {
+			setErrors((prev) => [...prev, "Order save failed: quantity exceeds available stock"]);
+			return;
+		}
 
 		const orderItems = items.map((item) => {
 			const unitPrice = Number(item.unitPrice || 0);
@@ -54,6 +69,9 @@ export default function useCart({
 			if (typeof refreshOrders === "function") {
 				await refreshOrders();
 			}
+			if (typeof refreshProducts === "function") {
+				await refreshProducts();
+			}
 		} catch (error) {
 			setErrors((prev) => [...prev, `Order save failed: ${error.message}`]);
 		}
@@ -61,6 +79,7 @@ export default function useCart({
 
 	return {
 		cartTotal,
+		hasQuantityOverStock,
 		submitOrder,
 	};
 }

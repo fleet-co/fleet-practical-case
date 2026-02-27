@@ -784,6 +784,7 @@ function App() {
 						setStatusMessage={setStatusMessage}
 						setErrors={setErrors}
 						refreshOrders={fetchOrders}
+						refreshProducts={fetchProducts}
 					/>
 				) : activeTab === "orders" ? (
 					<OrdersPanel orders={orders} />
