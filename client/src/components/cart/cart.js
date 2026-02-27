@@ -54,7 +54,7 @@ const Cart = forwardRef((props, ref) => {
                                         <div className="cart-item-info">
                                             <h5>{item.name}</h5>
                                             <p>{item.configuration}</p>
-                                            <p className="cart-item-price">${item.price * item.quantity}</p>
+                                            <p className="cart-item-price">${item.price * item.quantity }</p>
                                         </div>
                                         <div className="cart-item-actions">
                                             <div>Quantity: {item.quantity}</div>
