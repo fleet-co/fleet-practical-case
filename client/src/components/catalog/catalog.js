@@ -11,10 +11,10 @@ const Catalog = forwardRef((props, ref) => {
         try {
             const data = await fetchProducts();
 
-            const cartItems = JSON.parse(localStorage.getItem("cartItems") || "[]");
+            const cartItems = JSON.parse(localStorage.getItem("cartItems") || "{}");
 
             const filteredProducts = data.map((p) => {
-                const cartItem = cartItems.find((item) => item.id === p.id);
+                const cartItem = cartItems[p.id];
 
                 if (!cartItem) return p;
 

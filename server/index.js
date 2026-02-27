@@ -549,6 +549,74 @@ app.get("/api/orders", (req, res) => {
   });
 });
 
+app.post("/api/orders", (req, res) => {
+  const payload = req.body || {};
+  const items = payload.items || [];
+
+  console.log("Received order creation request with payload:", payload);
+  console.log("Received order creation request with items:", items);
+
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ message: "Order must contain at least one item" });
+  }
+
+  const totalAmount = items.reduce((sum, item) => sum + item.line_total, 0);
+  const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
+
+  db.serialize(() => {
+    db.run(
+      "INSERT INTO orders (total_amount, item_count) VALUES (?, ?)",
+      [totalAmount, itemCount],
+      function onInsert(err) {
+        if (err) {
+          return res
+            .status(500)
+            .json({ message: "Failed to create order", detail: err.message });
+        }
+
+        const orderId = this.lastID;
+        const stmt = db.prepare(`
+          INSERT INTO order_items (
+            order_id,
+            product_id,
+            product_variant_id,
+            product_name,
+            configuration,
+            sku,
+            unit_price,
+            quantity,
+            line_total
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+
+        for (const item of items) {
+          stmt.run(
+            orderId,
+            item.product_id,
+            item.product_variant_id,
+            item.product_name,
+            item.configuration,
+            item.sku,
+            item.unit_price,
+            item.quantity,
+            item.line_total
+          );
+        }
+
+        stmt.finalize((finalizeErr) => {
+          if (finalizeErr) {
+            return res.status(500).json({
+              message: "Order created but failed to save items",
+              detail: finalizeErr.message,
+            });
+          }
+          res.status(201).json({ order_id: orderId });
+        });
+      },
+    );
+  });
+});
+
 app.listen(PORT, () => {
   console.log(`API running on http://localhost:${PORT}`);
 });

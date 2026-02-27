@@ -1,11 +1,12 @@
 import { useState, useEffect, forwardRef, useImperativeHandle } from "react";
 import "./cart.css";
+import { createOrder } from "./cart.service";
 
 const Cart = forwardRef((props, ref) => {
     const [isOpenState, setIsOpenState] = useState(false);
     const [cartItems, setCartItems] = useState(() => {
         const savedCart = localStorage.getItem("cartItems");
-        return savedCart ? JSON.parse(savedCart) : [];
+        return savedCart ? JSON.parse(savedCart) : {};
     });
     const { addProduct } = props;
 
@@ -14,21 +15,28 @@ const Cart = forwardRef((props, ref) => {
     }, [cartItems]);
 
     function addToCart(product) {
-        setCartItems((prev) => [...prev, product]);
+        cartItems[product.id] = cartItems[product.id] || { ...product, quantity: 0 };
+        cartItems[product.id].quantity += 1;
+        setCartItems({ ...cartItems });
     }
 
     function removeFromCart(index) {
-        setCartItems((prev) => prev.filter((_, i) => i !== index));
+        cartItems[index].quantity -= 1;
         addProduct(cartItems[index].id);
+        if (cartItems[index].quantity <= 0) {
+            delete cartItems[index];
+        }
+
+        setCartItems(({ ...cartItems }));
     }
 
     useImperativeHandle(ref, () => ({
-        addToCart,
-        getCartItems: () => cartItems,
+        addToCart
     }));
 
     function handleCheckout(cartItems) {
-        alert("Checkout functionality is not implemented yet.");
+        console.log("Checking out with items:", cartItems);
+        createOrder(cartItems);
     }
 
     return (
@@ -36,23 +44,23 @@ const Cart = forwardRef((props, ref) => {
             <div className={`sidebar ${isOpenState ? "open" : ""}`}>
                 <div className="sidebar-content">
                     <h2>Shopping Cart</h2>
-                    {cartItems.length === 0 ? (
+                    {Object.keys(cartItems).length === 0 ? (
                         <p>Your cart is empty.</p>
                     ) : (
                         <div className="cart-details">
                             <div className="cart-items">
-                                {cartItems.map((item, index) => (
-                                    <div key={index} className="cart-item-card">
+                                {Object.entries(cartItems).map(([key, item]) => (
+                                    <div key={key} className="cart-item-card">
                                         <div className="cart-item-info">
                                             <h5>{item.name}</h5>
                                             <p className="cart-item-price">${item.price}</p>
                                         </div>
                                         <div>
-
+                                            <div>Quantity: {item.quantity}</div>
                                         </div>
                                         <button
                                             className="cart-item-remove"
-                                            onClick={() => removeFromCart(index)}
+                                            onClick={() => removeFromCart(key)}
                                         >
                                             ✕
                                         </button>
@@ -62,7 +70,7 @@ const Cart = forwardRef((props, ref) => {
                             <div className="cart-total">
                                 <h3>
                                     Total: $
-                                    {cartItems.reduce((total, item) => total + item.price, 0)}
+                                    {Object.values(cartItems).reduce((total, item) => total + (item.price * item.quantity), 0)}
                                 </h3>
                             </div>
                             <button className="checkout-button" onClick={() => handleCheckout(cartItems)}>Checkout</button>
