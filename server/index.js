@@ -61,6 +61,33 @@ db.serialize(() => {
       FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
     )
   `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS orders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      total_amount REAL NOT NULL,
+      item_count INTEGER NOT NULL,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS order_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_id INTEGER NOT NULL,
+      product_id INTEGER NOT NULL,
+      product_variant_id INTEGER NOT NULL,
+      product_name TEXT NOT NULL,
+      configuration TEXT NOT NULL,
+      sku TEXT NOT NULL,
+      unit_price REAL NOT NULL,
+      quantity INTEGER NOT NULL,
+      line_total REAL NOT NULL,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+      FOREIGN KEY (product_variant_id) REFERENCES product_variants(id)
+    )
+  `);
 });
 
 app.get("/api/health", (req, res) => {
@@ -493,6 +520,33 @@ app.get("/api/products", (req, res) => {
     res.json(rows);
   });
 
+});
+
+app.get("/api/orders", (req, res) => {
+  let sql = `
+    SELECT
+    o.id as order_id,
+    o.total_amount as total_price,
+    o.created_at as order_date,
+    oi.product_name,
+    oi.configuration,
+    oi.sku,
+    oi.unit_price,
+    oi.quantity,
+    oi.line_total
+    FROM orders o
+    JOIN order_items oi ON oi.order_id = o.id
+    ORDER BY o.created_at DESC;
+  `;
+
+  db.all(sql, [], (err, rows) => {
+    if (err) {
+      return res
+        .status(500)
+        .json({ message: "Failed to fetch orders", detail: err.message });
+    }
+    res.json(rows);
+  });
 });
 
 app.listen(PORT, () => {

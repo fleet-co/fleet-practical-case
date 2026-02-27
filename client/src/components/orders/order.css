@@ -1,0 +1,16 @@
+.order-container {
+  padding: 20px;
+  border: 1px solid #d8e1ec;
+  border-radius: 8px;
+}
+
+.order-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.order-header p {
+    margin: 0;
+    font-size: 16px;
+}
