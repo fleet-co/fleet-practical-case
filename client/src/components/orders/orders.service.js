@@ -5,5 +5,13 @@ export async function fetchOrders() {
     throw new Error(json.message || "Could not load orders");
   }
   const groupedOrders = Object.groupBy(json, (order) => order.order_id);
-  return groupedOrders;
+
+  const sortedOrders = Object.entries(
+    Object.groupBy(json, (order) => order.order_id)
+  ).sort(([, a], [, b]) =>
+    new Date(b[0].order_date.replace(" ", "T")) -
+    new Date(a[0].order_date.replace(" ", "T"))
+  );
+
+  return sortedOrders;
 }

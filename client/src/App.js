@@ -35,6 +35,7 @@ function App() {
   const [lastRefreshAt, setLastRefreshAt] = useState("");
 
   const catalogRef = useRef();
+  const ordersRef = useRef();
 
   const roleOptions = useMemo(() => {
     const set = new Set();
@@ -489,6 +490,9 @@ function App() {
             if (catalogRef.current) {
               catalogRef.current.refreshProducts();
             }
+            if (ordersRef.current) {
+              ordersRef.current.refreshOrders();
+            }
           }}
         >
           Manual refresh
@@ -788,7 +792,7 @@ function App() {
           </> : null}
 
         {activeTab === "orders" ?
-          <Orders />
+          <Orders ref={ordersRef} setErrors={setErrors} />
           : null}
       </main>
     </div>

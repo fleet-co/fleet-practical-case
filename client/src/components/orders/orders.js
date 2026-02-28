@@ -5,11 +5,21 @@ import "./order.css";
 const Orders = forwardRef((props, ref) => {
     const [orders, setOrders] = useState([]);
 
-    function refreshOrders() {
-        fetchOrders()
-            .then(setOrders)
-            .catch((err) => alert("Failed to load orders: " + err.message));
+    const { setErrors } = props;
+
+    async function refreshOrders() {
+        try {
+            const ordersData = await fetchOrders();
+            setOrders(ordersData);
+            console.log("Orders component mounted", ordersData);
+        } catch (err) {
+            setErrors((prev) => [...prev, err.message]);
+        }
     }
+
+    useImperativeHandle(ref, () => ({
+        refreshOrders,
+    }));
 
     useEffect(() => {
         refreshOrders();
@@ -21,7 +31,7 @@ const Orders = forwardRef((props, ref) => {
             {orders.length === 0 ? (
                 <p>No orders found.</p>
             ) : (
-                Object.entries(orders).map(([order_id, order]) => (
+                orders.map(([order_id, order]) => (
                     <div key={order_id} className="order-container">
                         <div className="order-header">
                             <p><b>Order ID:</b> {order_id}</p>
