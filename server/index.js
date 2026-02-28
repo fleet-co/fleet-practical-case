@@ -287,7 +287,7 @@ app.get("/api/devices", (req, res) => {
       d.owner_id,
       d.created_at
     FROM devices d
-    WHERE 1 = 1
+    WHERE owner_id IS NOT NULL
   `;
   const params = [];
 
