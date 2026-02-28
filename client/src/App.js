@@ -31,7 +31,6 @@ function App() {
     assignedDevices: 0,
   });
   const [ownerNameById, setOwnerNameById] = useState({});
-  const [loadingOwnerNames, setLoadingOwnerNames] = useState(false);
   const [lastRefreshAt, setLastRefreshAt] = useState("");
 
   const catalogRef = useRef();
@@ -125,49 +124,22 @@ function App() {
       return;
     }
 
-    setLoadingOwnerNames(true);
-    setOwnerNameById({});
+    const employeeById = Object.fromEntries(
+      employees.map(emp => [String(emp.id), emp.name])
+    );
 
-    Promise.all(
-      ownerIds.map(async (ownerId) => {
-        try {
-          const response = await fetch(`/api/employees/${ownerId}`);
+    const ownerNameMap = Object.fromEntries(
+      ownerIds.map(ownerId => [
+        ownerId,
+        employeeById[String(ownerId)] || `Unknown employee #${ownerId}`
+      ])
+    );
 
-          if (response.status === 404) {
-            return {
-              ownerId: String(ownerId),
-              ownerName: `Unknown employee #${ownerId}`,
-            };
-          }
-
-          if (!response.ok) {
-            throw new Error(`Failed to resolve owner ${ownerId}`);
-          }
-
-          const json = await response.json();
-          return {
-            ownerId: String(ownerId),
-            ownerName: json.name,
-          };
-        } catch (error) {
-          return {
-            ownerId: String(ownerId),
-            ownerName: `Unknown employee #${ownerId}`,
-          };
-        }
-      }),
-    )
-      .then((resolvedOwners) => {
-        const ownerMap = {};
-        resolvedOwners.forEach((owner) => {
-          ownerMap[owner.ownerId] = owner.ownerName;
-        });
-        setOwnerNameById(ownerMap);
-      })
-      .finally(() => {
-        setLoadingOwnerNames(false);
-      });
-  }, [filteredDevices, activeTab]);
+    setOwnerNameById(prev => ({
+      ...prev,
+      ...ownerNameMap
+    }));
+  }, [filteredDevices, activeTab, employees]);
 
   useEffect(() => {
     let nextEmployees = [...employees];
@@ -742,7 +714,6 @@ function App() {
 
             <h3>
               Device list {loadingDevices ? "(loading...)" : ""}{" "}
-              {loadingOwnerNames ? "(resolving owners...)" : ""}
             </h3>
             <table>
               <thead>
