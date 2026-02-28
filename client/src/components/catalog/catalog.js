@@ -1,4 +1,4 @@
-import { useEffect, useState, useImperativeHandle, forwardRef, useRef } from "react";
+import { useEffect, useState, useImperativeHandle, forwardRef, useRef, useCallback } from "react";
 import { fetchProducts } from "./catalog.service";
 import Cart from "../cart/cart";
 
@@ -7,7 +7,7 @@ const Catalog = forwardRef((props, ref) => {
     const cartRef = useRef();
     const { setErrors } = props;
 
-    const refreshProducts = async () => {
+    const refreshProducts = useCallback(async () => {
         try {
             const data = await fetchProducts();
 
@@ -29,11 +29,11 @@ const Catalog = forwardRef((props, ref) => {
         } catch (error) {
             setErrors((prev) => [...prev, error.message]);
         }
-    };
+    }, [setErrors]);
 
     useEffect(() => {
         refreshProducts();
-    }, []);
+    }, [refreshProducts]);
 
     useImperativeHandle(ref, () => ({
         refreshProducts,

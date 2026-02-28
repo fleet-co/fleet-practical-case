@@ -1,4 +1,4 @@
-import { useState, useEffect, forwardRef, useImperativeHandle } from "react";
+import { useState, useEffect, forwardRef, useImperativeHandle, useCallback } from "react";
 import { fetchOrders } from "./orders.service";
 import "./order.css";
 
@@ -7,7 +7,7 @@ const Orders = forwardRef((props, ref) => {
 
     const { setErrors } = props;
 
-    async function refreshOrders() {
+    const refreshOrders = useCallback(async () => {
         try {
             const ordersData = await fetchOrders();
             setOrders(ordersData);
@@ -15,7 +15,7 @@ const Orders = forwardRef((props, ref) => {
         } catch (err) {
             setErrors((prev) => [...prev, err.message]);
         }
-    }
+    }, [setErrors]);
 
     useImperativeHandle(ref, () => ({
         refreshOrders,
@@ -23,7 +23,7 @@ const Orders = forwardRef((props, ref) => {
 
     useEffect(() => {
         refreshOrders();
-    }, []);
+    }, [refreshOrders]);
 
     return (
         <section className="panel">

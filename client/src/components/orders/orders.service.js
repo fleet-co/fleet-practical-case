@@ -4,7 +4,6 @@ export async function fetchOrders() {
   if (!response.ok) {
     throw new Error(json.message || "Could not load orders");
   }
-  const groupedOrders = Object.groupBy(json, (order) => order.order_id);
 
   const sortedOrders = Object.entries(
     Object.groupBy(json, (order) => order.order_id)

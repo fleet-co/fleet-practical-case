@@ -1,6 +1,8 @@
 import { useState, useEffect, forwardRef, useImperativeHandle } from "react";
 import "./cart.css";
 import { createOrder } from "./cart.service";
+import { ReactComponent as CrossIcon } from "../../assets/cross.svg";
+import { ReactComponent as CartIcon } from "../../assets/cart.svg";
 
 const Cart = forwardRef((props, ref) => {
     const [isOpenState, setIsOpenState] = useState(false);
@@ -67,7 +69,7 @@ const Cart = forwardRef((props, ref) => {
                                                 className="cart-item-remove"
                                                 onClick={() => removeFromCart(key)}
                                             >
-                                                ✕
+                                                <CrossIcon />
                                             </button>
                                         </div>
                                     </div>
@@ -88,7 +90,7 @@ const Cart = forwardRef((props, ref) => {
                 className={`toggle-sidebar-button ${isOpenState ? "open" : ""}`}
                 onClick={() => setIsOpenState(!isOpenState)}
             >
-                {isOpenState ? "✕" : "☰"}
+                {isOpenState ? <CrossIcon /> : <span className="cart-button"><CartIcon /> My Cart</span>}
             </button>
         </>
     );

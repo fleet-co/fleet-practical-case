@@ -96,9 +96,13 @@
     line-height: 100%;
     cursor: pointer;
     border-radius: 50%;
-    width: 30px;
-    height: 30px;
+    width: 28px;
+    height: 28px;
     transition: background-color 0.2s ease;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .cart-item-remove:hover {
@@ -110,7 +114,6 @@
     top: 20px;
     right: 10px;
     z-index: 1001;
-    width: 40px;
     height: 40px;
     background: #fff;
     border: 1px solid #ddd;
@@ -124,4 +127,12 @@
 
 .toggle-sidebar-button.open {
     right: 430px;
+    width: 40px;
+}
+
+.cart-button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
 }
