@@ -160,10 +160,164 @@ th {
   background: #eef3fa;
 }
 
+.catalog-tab-layout {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 12px;
+  align-items: start;
+}
+
+.cart-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cart-sidebar h3 {
+  margin: 0;
+}
+
+.cart-empty {
+  margin: 0;
+  color: #647282;
+  font-size: 14px;
+}
+
+.cart-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.cart-item,
+.cart-item-last {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 0;
+}
+
+.cart-item {
+  border-bottom: 1px solid #d4dde8;
+}
+
+.cart-item-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.cart-item-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cart-item-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cart-item-controls span {
+  min-width: 20px;
+  text-align: center;
+  font-size: 14px;
+}
+
+.cart-item-subtotal {
+  flex: 1;
+  text-align: right;
+  font-size: 13px;
+}
+
+.cart-item-remove {
+  font-size: 12px;
+  color: #b94040;
+  border-color: #e0a0a0;
+}
+
+.cart-total {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 700;
+  font-size: 15px;
+  padding-top: 4px;
+  border-top: 2px solid #d4dde8;
+}
+
+.orders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.order-card {
+  border: 1px solid #d4dde8;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.order-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  background: #eef3fa;
+  border-bottom: 1px solid #d4dde8;
+}
+
+.order-card-id {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.order-card-date {
+  font-size: 13px;
+  color: #647282;
+}
+
+.order-card table {
+  border: none;
+}
+
+.order-card th,
+.order-card td {
+  border-left: none;
+  border-right: none;
+}
+
+.order-card th:first-child,
+.order-card td:first-child {
+  border-left: none;
+}
+
+.order-card-total {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 12px;
+  font-weight: 700;
+  font-size: 14px;
+  border-top: 2px solid #d4dde8;
+  background: #f9fbfd;
+}
+
+.cart-confirm {
+  width: 100%;
+  background: #24323f;
+  color: #ffffff;
+  border-color: #24323f;
+  padding: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 @media (max-width: 800px) {
   .app-kpis,
   .app-form,
-  .filters {
+  .filters,
+  .catalog-tab-layout {
     grid-template-columns: 1fr;
   }
 }

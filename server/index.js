@@ -19,6 +19,9 @@ const db = new sqlite3.Database(dbPath, (err) => {
 });
 
 db.serialize(() => {
+  // SQLite does not enforce foreign key constraints by default — this enables them for this connection
+  db.run("PRAGMA foreign_keys = ON");
+
   db.run(`
     CREATE TABLE IF NOT EXISTS employees (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -36,6 +39,66 @@ db.serialize(() => {
       owner_id INTEGER,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (owner_id) REFERENCES employees(id) ON DELETE SET NULL
+    )
+  `);
+
+  // Legacy flat catalog — kept for data preservation, no longer used by the API
+  db.run(`
+    CREATE TABLE IF NOT EXISTS catalog (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      type TEXT NOT NULL,
+      quantity INTEGER NOT NULL CHECK (quantity >= 0),
+      net_unit_price REAL NOT NULL DEFAULT 0 CHECK (net_unit_price >= 0)
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS products (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active',
+      base_price REAL NOT NULL DEFAULT 0,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS product_variants (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      product_id INTEGER NOT NULL,
+      configuration TEXT NOT NULL,
+      sku TEXT NOT NULL UNIQUE,
+      price_delta REAL NOT NULL DEFAULT 0,
+      stock INTEGER NOT NULL DEFAULT 0 CHECK (stock >= 0),
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS orders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      total_amount REAL NOT NULL DEFAULT 0 CHECK (total_amount >= 0),
+      item_count INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS order_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_id INTEGER NOT NULL,
+      product_id INTEGER NOT NULL,
+      product_variant_id INTEGER NOT NULL,
+      product_name TEXT NOT NULL,
+      configuration TEXT NOT NULL,
+      sku TEXT NOT NULL,
+      unit_price REAL NOT NULL,
+      quantity INTEGER NOT NULL CHECK (quantity > 0),
+      line_total REAL NOT NULL,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
     )
   `);
 });
@@ -438,6 +501,395 @@ app.delete("/api/devices/:id", (req, res) => {
       }
       if (this.changes === 0) {
         return res.status(404).json({ message: "Device not found" });
+      }
+      res.json({ success: true });
+    },
+  );
+});
+
+// Returns all product variants as a flat browsable catalog.
+// Each row is one orderable variant; product info is joined in.
+// Field names are aliased to match the shape the client already consumes
+// (id, name, type, quantity, net_unit_price) so the frontend needs
+// minimal changes.
+app.get("/api/catalog", (req, res) => {
+  const status = req.query.status || "active";
+  const search = req.query.search || "";
+
+  let sql = `
+    SELECT
+      pv.id,
+      p.id          AS product_id,
+      p.name,
+      p.status,
+      pv.configuration,
+      pv.sku,
+      pv.stock,
+      (p.base_price + pv.price_delta) AS effective_price
+    FROM product_variants pv
+    JOIN products p ON p.id = pv.product_id
+    WHERE 1 = 1
+  `;
+  const params = [];
+
+  if (status) {
+    sql += " AND p.status = ?";
+    params.push(status);
+  }
+
+  if (search) {
+    sql += " AND (LOWER(p.name) LIKE ? OR LOWER(pv.configuration) LIKE ? OR LOWER(pv.sku) LIKE ?)";
+    params.push(`%${search.toLowerCase()}%`);
+    params.push(`%${search.toLowerCase()}%`);
+    params.push(`%${search.toLowerCase()}%`);
+  }
+
+  sql += " ORDER BY p.id ASC, pv.id ASC";
+
+  db.all(sql, params, (err, rows) => {
+    if (err) {
+      return res
+        .status(500)
+        .json({ message: "Failed to fetch catalog", detail: err.message });
+    }
+    res.json(rows);
+  });
+});
+
+// Returns a single variant by its id, in the same shape as the list endpoint.
+app.get("/api/catalog/:id", (req, res) => {
+  const variantId = Number(req.params.id);
+  if (!variantId) {
+    return res.status(400).json({ message: "Invalid catalog id" });
+  }
+
+  db.get(
+    `SELECT
+      pv.id,
+      p.id          AS product_id,
+      p.name,
+      p.status,
+      pv.configuration,
+      pv.sku,
+      pv.stock,
+      (p.base_price + pv.price_delta) AS effective_price
+    FROM product_variants pv
+    JOIN products p ON p.id = pv.product_id
+    WHERE pv.id = ?`,
+    [variantId],
+    (err, row) => {
+      if (err) {
+        return res
+          .status(500)
+          .json({ message: "Failed to fetch catalog item", detail: err.message });
+      }
+      if (!row) {
+        return res.status(404).json({ message: "Catalog item not found" });
+      }
+      res.json(row);
+    },
+  );
+});
+
+// Returns all orders newest-first. total_amount and item_count are stored
+// directly on the orders row (denormalized at insert time) so no join needed.
+app.get("/api/orders", (req, res) => {
+  db.all(
+    `SELECT
+      id,
+      created_at,
+      item_count,
+      total_amount
+    FROM orders
+    ORDER BY id DESC`,
+    [],
+    (err, rows) => {
+      if (err) {
+        return res
+          .status(500)
+          .json({ message: "Failed to fetch orders", detail: err.message });
+      }
+      res.json(rows);
+    },
+  );
+});
+
+// Returns a single order with its full line items. All product fields are
+// read from the snapshot columns on order_items — no join to products needed.
+// catalog_name and price are aliased to maintain the client's expected shape.
+app.get("/api/orders/:id", (req, res) => {
+  const orderId = Number(req.params.id);
+  if (!orderId) {
+    return res.status(400).json({ message: "Invalid order id" });
+  }
+
+  db.get(
+    "SELECT id, created_at, total_amount, item_count FROM orders WHERE id = ?",
+    [orderId],
+    (err, order) => {
+      if (err) {
+        return res
+          .status(500)
+          .json({ message: "Failed to fetch order", detail: err.message });
+      }
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      db.all(
+        `SELECT
+          oi.id,
+          oi.product_id,
+          oi.product_variant_id,
+          oi.product_name,
+          oi.configuration,
+          oi.sku,
+          oi.unit_price,
+          oi.quantity,
+          oi.line_total
+        FROM order_items oi
+        WHERE oi.order_id = ?`,
+        [orderId],
+        (itemsErr, items) => {
+          if (itemsErr) {
+            return res.status(500).json({
+              message: "Failed to fetch order items",
+              detail: itemsErr.message,
+            });
+          }
+          res.json({ ...order, items });
+        },
+      );
+    },
+  );
+});
+
+// Creates an order from a list of { variantId, quantity } items.
+// Product name, configuration, SKU, and unit price are all snapshotted from
+// the variant at request time so past orders are unaffected by future changes.
+// total_amount and item_count are computed here and stored on the order row.
+// Everything is wrapped in a transaction so a failure never leaves a partial order.
+app.post("/api/orders", (req, res) => {
+  const payload = req.body || {};
+  const items = Array.isArray(payload.items) ? payload.items : [];
+
+  if (items.length === 0) {
+    return res
+      .status(400)
+      .json({ message: "Order must contain at least one item" });
+  }
+
+  // Validate shape of each line item before touching the database.
+  for (const item of items) {
+    const variantId = Number(item.variantId);
+    const quantity = Number(item.quantity);
+    if (!variantId || !Number.isInteger(quantity) || quantity <= 0) {
+      return res.status(400).json({
+        message: "Each item requires a valid variantId and a positive integer quantity",
+      });
+    }
+  }
+
+  const variantIds = items.map((item) => Number(item.variantId));
+  const inPlaceholders = variantIds.map(() => "?").join(", ");
+
+  // Fetch all referenced variants with their product info in one query.
+  db.all(
+    `SELECT
+      pv.id          AS variant_id,
+      pv.product_id,
+      p.name         AS product_name,
+      pv.configuration,
+      pv.sku,
+      pv.stock,
+      (p.base_price + pv.price_delta) AS unit_price
+    FROM product_variants pv
+    JOIN products p ON p.id = pv.product_id
+    WHERE pv.id IN (${inPlaceholders})`,
+    variantIds,
+    (err, variantRows) => {
+      if (err) {
+        return res.status(500).json({
+          message: "Failed to validate catalog items",
+          detail: err.message,
+        });
+      }
+
+      // Index by variant_id for O(1) lookup when building insert values.
+      const variantMap = {};
+      variantRows.forEach((row) => {
+        variantMap[row.variant_id] = row;
+      });
+
+      for (const item of items) {
+        const variantId = Number(item.variantId);
+        if (!variantMap[variantId]) {
+          return res.status(400).json({
+            message: `Catalog item ${variantId} not found`,
+          });
+        }
+      }
+
+      // Compute order-level aggregates up front so they can be stored on the order row.
+      const totalAmount = items.reduce((sum, item) => {
+        const v = variantMap[Number(item.variantId)];
+        return sum + v.unit_price * Number(item.quantity);
+      }, 0);
+      const itemCount = items.reduce((sum, item) => sum + Number(item.quantity), 0);
+
+      db.run("BEGIN TRANSACTION", (beginErr) => {
+        if (beginErr) {
+          return res
+            .status(500)
+            .json({ message: "Failed to begin transaction" });
+        }
+
+        db.run(
+          "INSERT INTO orders (total_amount, item_count) VALUES (?, ?)",
+          [totalAmount, itemCount],
+          function onInsertOrder(err) {
+            if (err) {
+              db.run("ROLLBACK");
+              return res.status(500).json({
+                message: "Failed to create order",
+                detail: err.message,
+              });
+            }
+
+            const orderId = this.lastID;
+
+            // Build a single multi-row INSERT to keep the transaction short.
+            const rowPlaceholders = items.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
+            const rowValues = items.flatMap((item) => {
+              const variantId = Number(item.variantId);
+              const v = variantMap[variantId];
+              const qty = Number(item.quantity);
+              return [
+                orderId,
+                v.product_id,
+                variantId,
+                v.product_name,       // snapshot
+                v.configuration,      // snapshot
+                v.sku,                // snapshot
+                v.unit_price,         // snapshot
+                qty,
+                v.unit_price * qty,   // line_total
+              ];
+            });
+
+            db.run(
+              `INSERT INTO order_items
+                (order_id, product_id, product_variant_id, product_name, configuration, sku, unit_price, quantity, line_total)
+               VALUES ${rowPlaceholders}`,
+              rowValues,
+              (itemErr) => {
+                if (itemErr) {
+                  db.run("ROLLBACK");
+                  return res.status(500).json({
+                    message: "Failed to insert order items",
+                    detail: itemErr.message,
+                  });
+                }
+
+                // Decrement stock for each ordered variant in a single UPDATE.
+                const stockCases = items
+                  .map(() => "WHEN ? THEN stock - ?")
+                  .join(" ");
+                const stockValues = items.flatMap((item) => [
+                  Number(item.variantId),
+                  Number(item.quantity),
+                ]);
+                const stockIds = items.map(() => "?").join(", ");
+
+                db.run(
+                  `UPDATE product_variants
+                   SET stock = CASE id ${stockCases} END
+                   WHERE id IN (${stockIds})`,
+                  [...stockValues, ...variantIds],
+                  (stockErr) => {
+                    if (stockErr) {
+                      db.run("ROLLBACK");
+                      return res.status(500).json({
+                        message: "Failed to update stock",
+                        detail: stockErr.message,
+                      });
+                    }
+
+                    db.run("COMMIT", (commitErr) => {
+                      if (commitErr) {
+                        db.run("ROLLBACK");
+                        return res
+                          .status(500)
+                          .json({ message: "Failed to commit order" });
+                      }
+
+                      // Re-fetch using the same shape as GET /api/orders/:id.
+                      db.get(
+                        "SELECT id, created_at, total_amount, item_count FROM orders WHERE id = ?",
+                        [orderId],
+                        (fetchErr, order) => {
+                          if (fetchErr) {
+                            return res.status(500).json({
+                              message: "Order created but failed to fetch it",
+                            });
+                          }
+
+                          db.all(
+                            `SELECT
+                              oi.id,
+                              oi.product_id,
+                              oi.product_variant_id,
+                              oi.product_name,
+                              oi.configuration,
+                              oi.sku,
+                              oi.unit_price,
+                              oi.quantity,
+                              oi.line_total
+                            FROM order_items oi
+                            WHERE oi.order_id = ?`,
+                            [orderId],
+                            (itemsFetchErr, orderItems) => {
+                              if (itemsFetchErr) {
+                                return res.status(500).json({
+                                  message: "Order created but failed to fetch items",
+                                });
+                              }
+                              res.status(201).json({ ...order, items: orderItems });
+                            },
+                          );
+                        },
+                      );
+                    });
+                  },
+                );
+              },
+            );
+          },
+        );
+      });
+    },
+  );
+});
+
+// Deletes an order. The ON DELETE CASCADE on order_items means the database
+// automatically removes all associated line items in the same operation.
+app.delete("/api/orders/:id", (req, res) => {
+  const orderId = Number(req.params.id);
+  if (!orderId) {
+    return res.status(400).json({ message: "Invalid order id" });
+  }
+
+  db.run(
+    "DELETE FROM orders WHERE id = ?",
+    [orderId],
+    function onDelete(err) {
+      if (err) {
+        return res
+          .status(500)
+          .json({ message: "Failed to delete order", detail: err.message });
+      }
+      if (this.changes === 0) {
+        return res.status(404).json({ message: "Order not found" });
       }
       res.json({ success: true });
     },
