@@ -1,11 +1,23 @@
 const request = require("supertest");
 const { createTestApp, seed, get } = require("../testDb");
 
+/**
+ * Integration tests for the device API endpoints.
+ *
+ * Each test runs against an isolated in-memory SQLite database created once
+ * per suite (beforeAll) and re-seeded before every test (beforeEach) so that
+ * mutations in one test never affect another. The EMPLOYEES fixture is included
+ * alongside DEVICES to exercise owner validation on POST/PUT and the owner_name
+ * join on responses.
+ */
+
+// Two employees used as owners in the device fixture
 const EMPLOYEES = [
   { id: 1, name: "Alice Martin", role: "Engineer" },
   { id: 2, name: "Bob Chen", role: "Designer" },
 ];
 
+// Mix of owned and unowned devices across multiple types for filter coverage
 const DEVICES = [
   { id: 1, name: "MacBook Pro 14", type: "Laptop", ownerId: 1 },
   { id: 2, name: "Dell XPS 15", type: "Laptop", ownerId: null },
@@ -125,8 +137,8 @@ describe("PUT /api/devices/:id", () => {
     expect(res.body.owner_name).toBe("Alice Martin");
   });
 
+  // Device id=1 is currently owned by Alice — sending ownerId: null should clear the assignment.
   test("unassigns a device when ownerId is null", async () => {
-    // device 1 is owned by Alice
     const res = await request(app)
       .put("/api/devices/1")
       .send({ name: "MacBook Pro 14", type: "Laptop", ownerId: null });

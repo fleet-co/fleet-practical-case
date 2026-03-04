@@ -1,11 +1,27 @@
 const express = require("express");
 const cors = require("cors");
 
+/**
+ * Creates and configures the Express application.
+ *
+ * Accepts a SQLite database connection as its only argument so the same route
+ * logic can be used in both production (fleet.sqlite) and tests (in-memory DB)
+ * without any mocking. On startup the function runs all CREATE TABLE IF NOT EXISTS
+ * statements inside a serialize block to ensure the schema is ready before any
+ * request is handled. Every route follows the same pattern: validate inputs, run
+ * the minimum number of database queries, and return a consistent JSON shape —
+ * either the created/updated resource or { success: true } for deletes.
+ *
+ * @param {import("sqlite3").Database} db - An open SQLite3 database connection.
+ * @returns {import("express").Application}
+ */
 function createApp(db) {
   const app = express();
   app.use(cors());
   app.use(express.json());
 
+  // Run all schema migrations inside serialize so they execute in order
+  // and complete before the first request can reach any route handler
   db.serialize(() => {
     // SQLite does not enforce foreign key constraints by default — this enables them for this connection
     db.run("PRAGMA foreign_keys = ON");
@@ -95,6 +111,11 @@ function createApp(db) {
     res.json({ ok: true, timestamp: new Date().toISOString() });
   });
 
+  /**
+   * GET /api/employees
+   * Returns all employees with a device_count aggregate, optionally filtered
+   * by role (exact match) and/or a search term (case-insensitive name or role).
+   */
   app.get("/api/employees", (req, res) => {
     const role = req.query.role || "";
     const search = req.query.search || "";
@@ -134,6 +155,10 @@ function createApp(db) {
     });
   });
 
+  /**
+   * GET /api/employees/:id
+   * Returns a single employee by ID. Responds 404 if not found.
+   */
   app.get("/api/employees/:id", (req, res) => {
     const employeeId = Number(req.params.id);
     if (!employeeId) {
@@ -157,6 +182,11 @@ function createApp(db) {
     );
   });
 
+  /**
+   * POST /api/employees
+   * Creates a new employee. Requires name and role in the request body.
+   * Responds 201 with the created record fetched back from the database.
+   */
   app.post("/api/employees", (req, res) => {
     const payload = req.body || {};
     const name = (payload.name || "").toString().trim();
@@ -176,6 +206,7 @@ function createApp(db) {
             .json({ message: "Failed to create employee", detail: err.message });
         }
 
+        // Re-fetch the created row so the response includes generated fields (id, created_at)
         db.get(
           "SELECT id, name, role, created_at FROM employees WHERE id = ?",
           [this.lastID],
@@ -192,6 +223,11 @@ function createApp(db) {
     );
   });
 
+  /**
+   * PUT /api/employees/:id
+   * Updates name and role for an existing employee. Responds 404 if not found.
+   * Re-fetches and returns the updated record after a successful write.
+   */
   app.put("/api/employees/:id", (req, res) => {
     const employeeId = Number(req.params.id);
     const payload = req.body || {};
@@ -215,6 +251,7 @@ function createApp(db) {
             .json({ message: "Failed to update employee", detail: err.message });
         }
 
+        // this.changes === 0 means no row matched the WHERE clause
         if (this.changes === 0) {
           return res.status(404).json({ message: "Employee not found" });
         }
@@ -235,6 +272,13 @@ function createApp(db) {
     );
   });
 
+  /**
+   * DELETE /api/employees/:id
+   * Deletes an employee. Devices owned by that employee are unassigned first
+   * (owner_id set to NULL) because the FK is ON DELETE SET NULL — the explicit
+   * UPDATE here makes the intent clear and handles any edge cases. Responds 404
+   * if the employee does not exist.
+   */
   app.delete("/api/employees/:id", (req, res) => {
     const employeeId = Number(req.params.id);
     if (!employeeId) {
@@ -242,6 +286,7 @@ function createApp(db) {
     }
 
     db.serialize(() => {
+      // Unassign devices before deleting so no device is left with a dangling owner_id
       db.run(
         "UPDATE devices SET owner_id = NULL WHERE owner_id = ?",
         [employeeId],
@@ -275,6 +320,11 @@ function createApp(db) {
     });
   });
 
+  /**
+   * GET /api/devices
+   * Returns all devices, optionally filtered by type (exact), ownerId (exact),
+   * and/or a search term (case-insensitive name or type match).
+   */
   app.get("/api/devices", (req, res) => {
     const type = req.query.type || "";
     const ownerId = req.query.ownerId || "";
@@ -320,6 +370,11 @@ function createApp(db) {
     });
   });
 
+  /**
+   * POST /api/devices
+   * Creates a new device. If ownerId is provided, it is validated against the
+   * employees table before inserting. The response includes the joined owner_name.
+   */
   app.post("/api/devices", (req, res) => {
     const payload = req.body || {};
     const name = (payload.name || "").toString().trim();
@@ -341,6 +396,7 @@ function createApp(db) {
               .json({ message: "Failed to create device", detail: err.message });
           }
 
+          // Re-fetch with a join so the response includes owner_name alongside owner_id
           db.get(
             `
             SELECT
@@ -372,6 +428,7 @@ function createApp(db) {
       return insertRecord();
     }
 
+    // Validate that the referenced employee exists before inserting
     db.get(
       "SELECT id FROM employees WHERE id = ?",
       [ownerId],
@@ -392,6 +449,12 @@ function createApp(db) {
     );
   });
 
+  /**
+   * PUT /api/devices/:id
+   * Updates name, type, and owner for an existing device. If ownerId is provided,
+   * it is validated against the employees table before updating. Responds 404 if
+   * the device does not exist. The response includes the joined owner_name.
+   */
   app.put("/api/devices/:id", (req, res) => {
     const deviceId = Number(req.params.id);
     const payload = req.body || {};
@@ -421,6 +484,7 @@ function createApp(db) {
             return res.status(404).json({ message: "Device not found" });
           }
 
+          // Re-fetch with a join so the response includes owner_name alongside owner_id
           db.get(
             `
             SELECT
@@ -452,6 +516,7 @@ function createApp(db) {
       return updateRecord();
     }
 
+    // Validate that the referenced employee exists before updating
     db.get(
       "SELECT id FROM employees WHERE id = ?",
       [ownerId],
@@ -472,6 +537,10 @@ function createApp(db) {
     );
   });
 
+  /**
+   * DELETE /api/devices/:id
+   * Deletes a device. Responds 404 if not found, { success: true } otherwise.
+   */
   app.delete("/api/devices/:id", (req, res) => {
     const deviceId = Number(req.params.id);
     if (!deviceId) {
@@ -495,8 +564,13 @@ function createApp(db) {
     );
   });
 
-  // Returns all product variants as a flat browsable catalog.
-  // Each row is one orderable variant; product info is joined in.
+  /**
+   * GET /api/catalog
+   * Returns all product variants as a flat browsable catalog. Each row is one
+   * orderable variant with its parent product info joined in. The effective_price
+   * is computed as base_price + price_delta. Filterable by product status (defaults
+   * to "active") and a search term (name, configuration, or SKU).
+   */
   app.get("/api/catalog", (req, res) => {
     const status = req.query.status || "active";
     const search = req.query.search || "";
@@ -541,7 +615,11 @@ function createApp(db) {
     });
   });
 
-  // Returns a single variant by its id, in the same shape as the list endpoint.
+  /**
+   * GET /api/catalog/:id
+   * Returns a single variant by its ID in the same shape as the list endpoint.
+   * Responds 404 if the variant does not exist.
+   */
   app.get("/api/catalog/:id", (req, res) => {
     const variantId = Number(req.params.id);
     if (!variantId) {
@@ -576,8 +654,11 @@ function createApp(db) {
     );
   });
 
-  // Returns all orders newest-first. total_amount and item_count are stored
-  // directly on the orders row (denormalized at insert time) so no join needed.
+  /**
+   * GET /api/orders
+   * Returns all orders newest-first. total_amount and item_count are stored
+   * directly on the orders row (denormalized at insert time) so no join is needed.
+   */
   app.get("/api/orders", (req, res) => {
     db.all(
       `SELECT
@@ -599,8 +680,12 @@ function createApp(db) {
     );
   });
 
-  // Returns a single order with its full line items. All product fields are
-  // read from the snapshot columns on order_items — no join to products needed.
+  /**
+   * GET /api/orders/:id
+   * Returns a single order with its full line items. All product fields are read
+   * from the snapshot columns on order_items — no join to products is needed,
+   * ensuring past orders are unaffected by subsequent catalog changes.
+   */
   app.get("/api/orders/:id", (req, res) => {
     const orderId = Number(req.params.id);
     if (!orderId) {
@@ -620,6 +705,7 @@ function createApp(db) {
           return res.status(404).json({ message: "Order not found" });
         }
 
+        // Fetch line items separately — they are linked by order_id FK
         db.all(
           `SELECT
             oi.id,
@@ -648,11 +734,17 @@ function createApp(db) {
     );
   });
 
-  // Creates an order from a list of { variantId, quantity } items.
-  // Product name, configuration, SKU, and unit price are all snapshotted from
-  // the variant at request time so past orders are unaffected by future changes.
-  // total_amount and item_count are computed here and stored on the order row.
-  // Everything is wrapped in a transaction so a failure never leaves a partial order.
+  /**
+   * POST /api/orders
+   * Creates an order from a list of { variantId, quantity } items. The handler:
+   * 1. Validates the shape of each line item before touching the database.
+   * 2. Fetches all referenced variants in a single query and indexes them by ID.
+   * 3. Computes total_amount and item_count up front for denormalized storage.
+   * 4. Runs the insert inside a transaction — order row, order_items rows, and
+   *    stock decrements — so a failure at any step never leaves a partial order.
+   * Product name, configuration, SKU, and unit price are snapshotted from the
+   * variant at request time so past orders survive future catalog changes.
+   */
   app.post("/api/orders", (req, res) => {
     const payload = req.body || {};
     const items = Array.isArray(payload.items) ? payload.items : [];
@@ -663,7 +755,7 @@ function createApp(db) {
         .json({ message: "Order must contain at least one item" });
     }
 
-    // Validate shape of each line item before touching the database.
+    // Validate shape of each line item before touching the database
     for (const item of items) {
       const variantId = Number(item.variantId);
       const quantity = Number(item.quantity);
@@ -677,7 +769,7 @@ function createApp(db) {
     const variantIds = items.map((item) => Number(item.variantId));
     const inPlaceholders = variantIds.map(() => "?").join(", ");
 
-    // Fetch all referenced variants with their product info in one query.
+    // Fetch all referenced variants with their product info in one query
     db.all(
       `SELECT
         pv.id          AS variant_id,
@@ -699,7 +791,7 @@ function createApp(db) {
           });
         }
 
-        // Index by variant_id for O(1) lookup when building insert values.
+        // Index by variant_id for O(1) lookup when building insert values
         const variantMap = {};
         variantRows.forEach((row) => {
           variantMap[row.variant_id] = row;
@@ -714,7 +806,7 @@ function createApp(db) {
           }
         }
 
-        // Compute order-level aggregates up front so they can be stored on the order row.
+        // Compute order-level aggregates up front so they can be stored on the order row
         const totalAmount = items.reduce((sum, item) => {
           const v = variantMap[Number(item.variantId)];
           return sum + v.unit_price * Number(item.quantity);
@@ -742,7 +834,7 @@ function createApp(db) {
 
               const orderId = this.lastID;
 
-              // Build a single multi-row INSERT to keep the transaction short.
+              // Build a single multi-row INSERT to keep the transaction short
               const rowPlaceholders = items.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
               const rowValues = items.flatMap((item) => {
                 const variantId = Number(item.variantId);
@@ -775,7 +867,7 @@ function createApp(db) {
                     });
                   }
 
-                  // Decrement stock for each ordered variant in a single UPDATE.
+                  // Decrement stock for each ordered variant in a single UPDATE
                   const stockCases = items
                     .map(() => "WHEN ? THEN stock - ?")
                     .join(" ");
@@ -807,7 +899,7 @@ function createApp(db) {
                             .json({ message: "Failed to commit order" });
                         }
 
-                        // Re-fetch using the same shape as GET /api/orders/:id.
+                        // Re-fetch using the same shape as GET /api/orders/:id
                         db.get(
                           "SELECT id, created_at, total_amount, item_count FROM orders WHERE id = ?",
                           [orderId],
@@ -855,8 +947,11 @@ function createApp(db) {
     );
   });
 
-  // Deletes an order. The ON DELETE CASCADE on order_items means the database
-  // automatically removes all associated line items in the same operation.
+  /**
+   * DELETE /api/orders/:id
+   * Deletes an order. The ON DELETE CASCADE on order_items means the database
+   * automatically removes all associated line items in the same operation.
+   */
   app.delete("/api/orders/:id", (req, res) => {
     const orderId = Number(req.params.id);
     if (!orderId) {

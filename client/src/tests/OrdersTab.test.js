@@ -1,6 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import OrdersTab from "../tabs/OrdersTab";
 
+// Fixtures — two orders covering single-item and multi-item cases
 const ORDERS = [
   {
     id: 1,
@@ -47,6 +48,14 @@ const ORDERS = [
   },
 ];
 
+/**
+ * Renders OrdersTab with the shared ORDERS fixture and any prop overrides.
+ * OrdersTab is a pure display component — it owns no state and makes no network
+ * calls, so no fetch mocking or async waiting is needed.
+ *
+ * @param {Object} [props={}] - Props to override on top of the defaults.
+ * @returns {RenderResult}
+ */
 function renderTab(props = {}) {
   return render(<OrdersTab orders={ORDERS} loadingOrders={false} {...props} />);
 }
@@ -78,6 +87,7 @@ describe("Rendering", () => {
     expect(screen.getByText("27 inch / 4K")).toBeInTheDocument();
   });
 
+  // MacBook Pro appears in both orders so getAllByText is used instead of getByText.
   test("renders product names within order cards", () => {
     renderTab();
     const macbookCells = screen.getAllByText("MacBook Pro");
@@ -85,21 +95,21 @@ describe("Rendering", () => {
     expect(screen.getByText("LG Display")).toBeInTheDocument();
   });
 
+  // 1 700,00 € formatted with fr-FR locale — multiple cells may display the same value.
   test("unit prices are formatted as EUR currency", () => {
     renderTab();
-    // 1 700,00 € (fr-FR locale)
     expect(screen.getAllByText(/1\s?700/).length).toBeGreaterThan(0);
   });
 
+  // Order 1: 1 × 1700 = 1700 — the value appears in unit price, subtotal, and total cells.
   test("order total equals sum of unit_price × quantity for single-item order", () => {
     renderTab({ orders: [ORDERS[0]] });
-    // Order 1: 1 × 1700 = 1700; multiple cells show 1700 (unit price, subtotal, total)
     expect(screen.getAllByText(/1\s?700/).length).toBeGreaterThan(0);
   });
 
+  // Order 2: 2300 + 400 = 2700.
   test("order total equals sum of unit_price × quantity for multi-item order", () => {
     renderTab({ orders: [ORDERS[1]] });
-    // Order 2: 2300 + 400 = 2700
     expect(screen.getByText(/2\s?700/)).toBeInTheDocument();
   });
 
@@ -115,6 +125,8 @@ describe("Rendering", () => {
     expect(screen.getByText("1")).toBeInTheDocument();
   });
 
+  // Custom order with quantity 2 to verify quantity rendering and computed subtotal.
+  // Subtotal: 2 × 1700 = 3400 — appears in both the subtotal cell and the card total.
   test("multi-unit line item displays correct quantity", () => {
     const orderWithQty = {
       id: 3,
@@ -134,12 +146,11 @@ describe("Rendering", () => {
       ],
     };
     renderTab({ orders: [orderWithQty] });
-    // Quantity 2 appears in the table
     expect(screen.getByText("2")).toBeInTheDocument();
-    // Subtotal: 2 × 1700 = 3400 (appears in both subtotal cell and card total)
     expect(screen.getAllByText(/3\s?400/).length).toBeGreaterThan(0);
   });
 
+  // Scoped to the article element to confirm the id renders inside its own card.
   test("card header shows the order id", () => {
     renderTab();
     const card1 = screen.getByText("Order #1").closest("article");

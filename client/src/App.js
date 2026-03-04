@@ -7,6 +7,19 @@ import OrdersTab from "./tabs/OrdersTab";
 
 const VALID_TABS = ["employees", "devices", "catalog", "orders"];
 
+/**
+ * Root application component for Fleet Device Manager.
+ *
+ * Owns all shared server state (employees, devices, catalog, orders) and is the
+ * single source of truth for data fetching. Tab navigation is persisted to both
+ * localStorage and the URL hash so the active view survives page refreshes and
+ * can be bookmarked. Error messages are accumulated in a dismissible banner;
+ * success messages auto-clear after 2.5 s. Child tabs receive data and callbacks
+ * as props — they never fetch directly or manage global state.
+ *
+ * @component
+ * @returns {JSX.Element}
+ */
 function App() {
   const [activeTab, setActiveTab] = useState("employees");
   const [employees, setEmployees] = useState([]);
@@ -27,7 +40,7 @@ function App() {
     assignedDevices: devices.filter((d) => d.owner_id).length,
   }), [employees, devices]);
 
-  // Restore tab from URL hash or localStorage on mount
+  // On mount: prefer the URL hash, fall back to localStorage, otherwise keep the default
   useEffect(() => {
     const hash = window.location.hash.replace("#", "");
     const savedTab = window.localStorage.getItem("fleet_active_tab");
@@ -38,17 +51,20 @@ function App() {
     }
   }, []);
 
+  // Keep localStorage and the URL hash in sync whenever the active tab changes
   useEffect(() => {
     window.localStorage.setItem("fleet_active_tab", activeTab);
     window.location.hash = activeTab;
   }, [activeTab]);
 
+  // Auto-clear the status message after 2.5 s; cancel the timer if it changes before then
   useEffect(() => {
     if (!statusMessage) return undefined;
     const timer = window.setTimeout(() => setStatusMessage(""), 2500);
     return () => window.clearTimeout(timer);
   }, [statusMessage]);
 
+  // Fetch all data once on initial mount
   useEffect(() => {
     fetchEmployees();
     fetchDevices();
@@ -56,6 +72,13 @@ function App() {
     fetchOrders();
   }, []);
 
+  /**
+   * Fetches the employee list from GET /api/employees and updates state.
+   * Non-2xx responses are treated the same as network errors and surfaced via addError.
+   *
+   * @async
+   * @returns {Promise<void>}
+   */
   async function fetchEmployees() {
     setLoadingEmployees(true);
     try {
@@ -71,6 +94,13 @@ function App() {
     }
   }
 
+  /**
+   * Fetches the device list from GET /api/devices and updates state.
+   * Non-2xx responses are treated the same as network errors and surfaced via addError.
+   *
+   * @async
+   * @returns {Promise<void>}
+   */
   async function fetchDevices() {
     setLoadingDevices(true);
     try {
@@ -86,6 +116,13 @@ function App() {
     }
   }
 
+  /**
+   * Fetches the product catalog from GET /api/catalog and updates state.
+   * Non-2xx responses are treated the same as network errors and surfaced via addError.
+   *
+   * @async
+   * @returns {Promise<void>}
+   */
   async function fetchCatalog() {
     setLoadingCatalog(true);
     try {
@@ -101,18 +138,33 @@ function App() {
     }
   }
 
+  /**
+   * Fetches order data in two phases: first the summary list from GET /api/orders,
+   * then the full line-item detail for each order via GET /api/orders/:id in parallel.
+   * This two-step approach keeps the list endpoint lightweight while still giving
+   * each rendered order its complete item breakdown. Individual detail calls that fail
+   * are gracefully degraded to { ...order, items: [] } so one bad order never blocks
+   * the rest from rendering.
+   *
+   * @async
+   * @returns {Promise<void>}
+   */
   async function fetchOrders() {
     setLoadingOrders(true);
     try {
+      // Phase 1: load the summary list
       const response = await fetch("/api/orders");
       const json = await response.json();
       if (!response.ok) throw new Error(json.message || "Could not load orders");
       const summaries = Array.isArray(json) ? json : [];
+
+      // Phase 2: enrich each summary with its full line items in parallel
       const detailed = await Promise.all(
         summaries.map(async (order) => {
           try {
             const r = await fetch(`/api/orders/${order.id}`);
             const j = await r.json();
+            // Fall back to the summary without items if the detail call fails
             return r.ok ? j : { ...order, items: [] };
           } catch {
             return { ...order, items: [] };
@@ -128,6 +180,14 @@ function App() {
     }
   }
 
+  /**
+   * Appends an error message to the error banner.
+   * Passed as the onError prop to all tab components so they can surface failures
+   * without owning any global error state themselves.
+   *
+   * @param {string} message - Human-readable description of the error.
+   * @returns {void}
+   */
   function addError(message) {
     setErrors((prev) => [...prev, message]);
   }

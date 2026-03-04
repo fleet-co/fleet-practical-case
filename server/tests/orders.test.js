@@ -1,16 +1,27 @@
 const request = require("supertest");
 const { createTestApp, seed, get, all } = require("../testDb");
 
+/**
+ * Integration tests for the order API endpoints.
+ *
+ * Each test runs against an isolated in-memory SQLite database created once
+ * per suite (beforeAll) and re-seeded before every test (beforeEach) so that
+ * mutations in one test never affect another. Pre-seeded orders allow GET and
+ * DELETE tests to run without depending on POST. The VARIANTS fixture includes
+ * a low-stock entry (stock=1) specifically to verify that the CHECK constraint
+ * causes a full transaction rollback when an order would push stock negative.
+ */
+
 const PRODUCTS = [
   { id: 1, name: "MacBook Pro", status: "active", base_price: 1500 },
   { id: 2, name: "LG Display", status: "active", base_price: 400 },
 ];
 
+// Variant id=4 has stock=1 — used to trigger the CHECK (stock >= 0) rollback test
 const VARIANTS = [
   { id: 1, product_id: 1, configuration: "M3 Pro / 18GB", sku: "MBP-M3P-18", price_delta: 200, stock: 5 },
   { id: 2, product_id: 1, configuration: "M3 Max / 36GB", sku: "MBP-M3M-36", price_delta: 800, stock: 3 },
   { id: 3, product_id: 2, configuration: "27 inch / 4K", sku: "LG27-4K", price_delta: 0, stock: 10 },
-  // Variant with very low stock — used to test the CHECK constraint / rollback
   { id: 4, product_id: 2, configuration: "32 inch / 4K", sku: "LG32-4K", price_delta: 100, stock: 1 },
 ];
 
@@ -133,8 +144,8 @@ describe("POST /api/orders", () => {
     expect(res.body.items).toHaveLength(1);
   });
 
+  // variant 1: effective_price = 1500 + 200 = 1700; total = 1700 × 2 = 3400.
   test("computes total_amount correctly (sum of unit_price × quantity)", async () => {
-    // variant 1 effective_price = 1500 + 200 = 1700 × 2 = 3400
     const res = await request(app)
       .post("/api/orders")
       .send({ items: [{ variantId: 1, quantity: 2 }] });
@@ -169,13 +180,13 @@ describe("POST /api/orders", () => {
     expect(after3.stock).toBe(before3.stock - 2);
   });
 
+  // Creates an order, then renames the product — the stored product_name must remain unchanged.
   test("snapshots product_name at order time — later rename does not affect stored item", async () => {
     const res = await request(app)
       .post("/api/orders")
       .send({ items: [{ variantId: 1, quantity: 1 }] });
     const orderId = res.body.id;
 
-    // Simulate product rename
     await get(db, "UPDATE products SET name = 'Renamed Pro' WHERE id = 1");
 
     const orderRes = await request(app).get(`/api/orders/${orderId}`);
@@ -227,13 +238,12 @@ describe("POST /api/orders", () => {
     expect(res.status).toBe(400);
   });
 
-  // Transaction integrity: ordering more than available stock causes the
-  // CHECK (stock >= 0) constraint to fail, rolling back the entire transaction.
+  // Variant id=4 has stock=1 — ordering 5 would push stock to -4, violating CHECK (stock >= 0).
+  // The entire transaction must roll back: no order row and no stock change.
   test("rolls back the transaction when stock would go negative — no order is created and stock is unchanged", async () => {
     const ordersBefore = await all(db, "SELECT id FROM orders");
     const stockBefore = await get(db, "SELECT stock FROM product_variants WHERE id = 4");
 
-    // variant 4 has stock = 1 — ordering 5 would push stock to -4
     const res = await request(app)
       .post("/api/orders")
       .send({ items: [{ variantId: 4, quantity: 5 }] });
@@ -241,10 +251,10 @@ describe("POST /api/orders", () => {
     expect(res.status).toBe(500);
 
     const ordersAfter = await all(db, "SELECT id FROM orders");
-    expect(ordersAfter).toHaveLength(ordersBefore.length); // no new order
+    expect(ordersAfter).toHaveLength(ordersBefore.length);
 
     const stockAfter = await get(db, "SELECT stock FROM product_variants WHERE id = 4");
-    expect(stockAfter.stock).toBe(stockBefore.stock); // stock unchanged
+    expect(stockAfter.stock).toBe(stockBefore.stock);
   });
 });
 
@@ -264,6 +274,7 @@ describe("DELETE /api/orders/:id", () => {
     expect(res.body.some((o) => o.id === 1)).toBe(false);
   });
 
+  // The ON DELETE CASCADE on order_items removes all line items automatically.
   test("cascades — associated order_items are also deleted", async () => {
     await request(app).delete("/api/orders/1");
     const items = await all(db, "SELECT id FROM order_items WHERE order_id = 1");

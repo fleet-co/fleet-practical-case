@@ -2,12 +2,21 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import EmployeesTab from "../tabs/EmployeesTab";
 
+// Fixtures — two Support employees and one Designer to exercise role filtering
 const EMPLOYEES = [
   { id: 1, name: "Alice Martin", role: "Support", device_count: 2 },
   { id: 2, name: "Bob Chen", role: "Designer", device_count: 0 },
   { id: 3, name: "Carol Dupont", role: "Support", device_count: 1 },
 ];
 
+/**
+ * Renders EmployeesTab with the shared EMPLOYEES fixture and any prop overrides.
+ * All callbacks default to jest.fn() stubs so tests only need to provide real
+ * implementations when asserting on specific callback behaviour.
+ *
+ * @param {Object} [props={}] - Props to override on top of the defaults.
+ * @returns {RenderResult}
+ */
 function renderTab(props = {}) {
   return render(
     <EmployeesTab
@@ -93,6 +102,7 @@ describe("Filtering", () => {
     expect(screen.queryByText("Alice Martin")).not.toBeInTheDocument();
   });
 
+  // The role filter is applied first, then the search narrows within that subset.
   test("role filter and search applied simultaneously narrow the results", () => {
     renderTab();
     userEvent.selectOptions(screen.getByRole("combobox", { name: /role filter/i }), "Support");
@@ -102,6 +112,7 @@ describe("Filtering", () => {
     expect(screen.queryByText("Bob Chen")).not.toBeInTheDocument();
   });
 
+  // The select value and visible rows should reflect the stored preference on mount.
   test("roleFilter is initialised from localStorage", () => {
     localStorage.setItem("fleet_role_filter", "Designer");
     renderTab();
@@ -129,6 +140,7 @@ describe("Create form", () => {
     onStatusMessage = jest.fn();
     onError = jest.fn();
 
+    // Default successful POST response
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ id: 4, name: "New Employee", role: "PM" }),
@@ -191,6 +203,7 @@ describe("Create form", () => {
     });
   });
 
+  // Overrides the default mock with a failing response for this test only.
   test("failed POST calls onError with the server message", async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: false,
@@ -212,6 +225,7 @@ describe("Create form", () => {
 // ---------------------------------------------------------------------------
 describe("Edit flow", () => {
   beforeEach(() => {
+    // Default successful PUT response
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ id: 1, name: "Alice Updated", role: "Ops" }),
@@ -220,6 +234,7 @@ describe("Edit flow", () => {
 
   afterEach(() => { delete global.fetch; });
 
+  // The first Edit button corresponds to Alice Martin (id=1).
   test("clicking Edit populates the form with the employee's data", () => {
     renderTab();
     userEvent.click(screen.getAllByRole("button", { name: /^edit$/i })[0]);
@@ -233,9 +248,10 @@ describe("Edit flow", () => {
     expect(screen.getByRole("heading", { name: /edit employee/i })).toBeInTheDocument();
   });
 
+  // Clicking the first Edit button targets Alice (id=1) — the PUT URL should include her id.
   test("submitting in edit mode sends PUT to /api/employees/:id", async () => {
     renderTab();
-    userEvent.click(screen.getAllByRole("button", { name: /^edit$/i })[0]); // Alice (id=1)
+    userEvent.click(screen.getAllByRole("button", { name: /^edit$/i })[0]);
     userEvent.click(screen.getByRole("button", { name: /^update$/i }));
 
     await waitFor(() => {
@@ -276,6 +292,7 @@ describe("Delete", () => {
     delete global.fetch;
   });
 
+  // The first Delete button corresponds to Alice (id=1).
   test("confirmed delete calls DELETE /api/employees/:id then fetchEmployees", async () => {
     jest.spyOn(window, "confirm").mockReturnValue(true);
     const fetchEmployees = jest.fn().mockResolvedValue();
@@ -285,7 +302,7 @@ describe("Delete", () => {
     });
     renderTab({ fetchEmployees });
 
-    userEvent.click(screen.getAllByRole("button", { name: /^delete$/i })[0]); // Alice (id=1)
+    userEvent.click(screen.getAllByRole("button", { name: /^delete$/i })[0]);
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(

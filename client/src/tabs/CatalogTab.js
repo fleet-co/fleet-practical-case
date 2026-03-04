@@ -1,5 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
 
+/**
+ * Tab for browsing the product catalog and placing orders.
+ *
+ * Displays the catalog as a filterable table and a cart sidebar. Filtering is
+ * applied locally via a free-text search across product name and configuration.
+ * The cart is managed entirely in local state (cartItems with an added cartQuantity
+ * field); quantities are capped at the item's available stock. On order confirmation,
+ * a POST /api/orders is sent with all cart line items, then the cart is cleared and
+ * fetchOrders is called so App can refresh its orders list. Errors are surfaced via
+ * the onError callback; the cart is intentionally preserved on failure so the user
+ * can retry without re-adding items.
+ *
+ * @param {Object}   props
+ * @param {Array}    props.catalog        - Full product catalog from the server.
+ * @param {boolean}  props.loadingCatalog - Whether App is currently fetching the catalog.
+ * @param {Function} props.fetchOrders    - Callback to refresh the orders list in App after a purchase.
+ * @param {Function} props.onError        - Callback to surface error messages in the global banner.
+ * @returns {JSX.Element}
+ */
 export default function CatalogTab({
   catalog,
   loadingCatalog,
@@ -11,11 +30,13 @@ export default function CatalogTab({
   const [cartItems, setCartItems] = useState([]);
   const [cartStatusMessage, setCartStatusMessage] = useState("");
 
+  // Compute the cart total from effective_price × cartQuantity for each line item
   const cartTotal = useMemo(
     () => cartItems.reduce((sum, item) => sum + item.effective_price * item.cartQuantity, 0),
     [cartItems],
   );
 
+  // Recompute the filtered catalog whenever the source data or search term changes
   useEffect(() => {
     let next = [...catalog];
     if (catalogSearch.trim()) {
@@ -28,16 +49,24 @@ export default function CatalogTab({
     setFilteredCatalog(next);
   }, [catalog, catalogSearch]);
 
+  // Auto-clear the cart status message after 2.5 s
   useEffect(() => {
     if (!cartStatusMessage) return undefined;
     const timer = window.setTimeout(() => setCartStatusMessage(""), 2500);
     return () => window.clearTimeout(timer);
   }, [cartStatusMessage]);
 
+  /**
+   * Adds an item to the cart. If the item is already present, increments its
+   * cartQuantity up to the item's stock limit instead of adding a duplicate entry.
+   *
+   * @param {{ id: number, effective_price: number, stock: number }} item
+   */
   function addToCart(item) {
     setCartItems((prev) => {
       const existing = prev.find((c) => c.id === item.id);
       if (existing) {
+        // Item already in cart — increment quantity, capped at available stock
         return prev.map((c) =>
           c.id === item.id
             ? { ...c, cartQuantity: Math.min(c.stock, c.cartQuantity + 1) }
@@ -48,10 +77,20 @@ export default function CatalogTab({
     });
   }
 
+  /**
+   * Removes an item from the cart entirely.
+   *
+   * @param {number} itemId
+   */
   function removeFromCart(itemId) {
     setCartItems((prev) => prev.filter((c) => c.id !== itemId));
   }
 
+  /**
+   * Increments the cartQuantity for an item, capped at its available stock.
+   *
+   * @param {number} itemId
+   */
   function incrementCartItem(itemId) {
     setCartItems((prev) =>
       prev.map((c) =>
@@ -62,6 +101,11 @@ export default function CatalogTab({
     );
   }
 
+  /**
+   * Decrements the cartQuantity for an item, floored at 1 (use removeFromCart to remove).
+   *
+   * @param {number} itemId
+   */
   function decrementCartItem(itemId) {
     setCartItems((prev) =>
       prev.map((c) =>
@@ -70,6 +114,14 @@ export default function CatalogTab({
     );
   }
 
+  /**
+   * Sends the current cart as a POST /api/orders request.
+   * On success the cart is cleared and fetchOrders is called to update App.
+   * On failure onError is called and the cart is preserved so the user can retry.
+   *
+   * @async
+   * @returns {Promise<void>}
+   */
   async function confirmOrder() {
     try {
       const response = await fetch("/api/orders", {
@@ -84,6 +136,7 @@ export default function CatalogTab({
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json.message || "Could not confirm order");
+      // Clear the cart and notify the user on success
       setCartItems([]);
       setCartStatusMessage("Order confirmed");
       await fetchOrders();

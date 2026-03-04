@@ -2,6 +2,7 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import CatalogTab from "../tabs/CatalogTab";
 
+// Fixtures — three items with stock and one out-of-stock item
 const CATALOG = [
   { id: 1, name: "MacBook Pro", configuration: "M3 Pro / 18GB", sku: "MBP-M3P-18", stock: 5, effective_price: 1700 },
   { id: 2, name: "MacBook Pro", configuration: "M3 Max / 36GB", sku: "MBP-M3M-36", stock: 3, effective_price: 2300 },
@@ -9,6 +10,14 @@ const CATALOG = [
   { id: 4, name: "Out of Stock Item", configuration: "Standard", sku: "OOS-STD", stock: 0, effective_price: 99 },
 ];
 
+/**
+ * Renders CatalogTab with the shared CATALOG fixture and any prop overrides.
+ * fetchOrders and onError are stubbed with jest.fn() by default so tests only
+ * need to provide real implementations when asserting on those callbacks.
+ *
+ * @param {Object} [props={}] - Props to override on top of the defaults.
+ * @returns {RenderResult}
+ */
 function renderTab(props = {}) {
   return render(
     <CatalogTab
@@ -29,9 +38,9 @@ beforeEach(() => {
 // Rendering
 // ---------------------------------------------------------------------------
 describe("Rendering", () => {
+  // Rows are identified by configuration since the product name is shared across variants.
   test("renders a row for each catalog item", () => {
     renderTab();
-    // Identify rows by configuration (SKU column is not rendered)
     expect(screen.getByText("M3 Pro / 18GB")).toBeInTheDocument();
     expect(screen.getByText("M3 Max / 36GB")).toBeInTheDocument();
     expect(screen.getByText("27 inch / 4K")).toBeInTheDocument();
@@ -49,14 +58,13 @@ describe("Rendering", () => {
 
   test("prices are formatted as EUR currency", () => {
     renderTab();
-    // 1 700,00 € or similar depending on locale
     expect(screen.getByText(/1\s?700/)).toBeInTheDocument();
   });
 
+  // The disabled button corresponds to the out-of-stock item (stock=0).
   test("'Add to cart' button is disabled when stock is 0", () => {
     renderTab();
     const buttons = screen.getAllByRole("button", { name: /add to cart/i });
-    // Last item has stock=0 — find it by checking disabled state
     const disabledButton = buttons.find((b) => b.disabled);
     expect(disabledButton).toBeTruthy();
   });
@@ -70,7 +78,7 @@ describe("Rendering", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Search
+// Search filtering
 // ---------------------------------------------------------------------------
 describe("Search filtering", () => {
   test("filters by product name", () => {
@@ -110,11 +118,11 @@ describe("Cart state", () => {
     expect(screen.getByText("Cart")).toBeInTheDocument();
   });
 
+  // A Remove button only appears when the cart is non-empty, confirming the item was added.
   test("adding an item shows it in the cart sidebar", () => {
     renderTab();
     const addButtons = screen.getAllByRole("button", { name: /add to cart/i });
-    userEvent.click(addButtons[0]); // MacBook Pro M3 Pro
-    // The cart shows a Remove button only when non-empty
+    userEvent.click(addButtons[0]);
     expect(screen.getByRole("button", { name: /remove/i })).toBeInTheDocument();
     expect(screen.queryByText(/your cart is empty/i)).not.toBeInTheDocument();
   });
@@ -125,17 +133,18 @@ describe("Cart state", () => {
     expect(screen.getByText(/cart \(1\)/i)).toBeInTheDocument();
   });
 
+  // Cart should show 1 unique line item with quantity 2, not two separate entries.
   test("adding the same item twice increments cartQuantity instead of duplicating", () => {
     renderTab();
     const addButtons = screen.getAllByRole("button", { name: /add to cart/i });
     userEvent.click(addButtons[0]);
     userEvent.click(addButtons[0]);
     expect(screen.getByText(/cart \(1\)/i)).toBeInTheDocument();
-    expect(screen.getByText("2")).toBeInTheDocument(); // quantity shown in cart
+    expect(screen.getByText("2")).toBeInTheDocument();
   });
 
+  // Uses an item with stock=1 so a single add immediately reaches the cap.
   test("cartQuantity cannot exceed item.stock — increment disabled at cap", () => {
-    // Use an item with stock=1 so it hits the cap immediately after 1 add
     const singleStockCatalog = [
       { id: 99, name: "Limited Item", configuration: "Only One", sku: "LIM-1", stock: 1, effective_price: 100 },
     ];
@@ -175,11 +184,11 @@ describe("Cart state", () => {
     expect(screen.getByText(/your cart is empty/i)).toBeInTheDocument();
   });
 
+  // Adds item id=1 (1700 €) twice → 2 × 1700 = 3400 €, shown in subtotal and total.
   test("cart total equals sum of effective_price × cartQuantity", () => {
     renderTab();
-    userEvent.click(screen.getAllByRole("button", { name: /add to cart/i })[0]); // 1700
-    userEvent.click(screen.getAllByRole("button", { name: /add to cart/i })[0]); // × 2 = 3400
-    // 3 400,00 € — appears in both the cart item subtotal and the cart total
+    userEvent.click(screen.getAllByRole("button", { name: /add to cart/i })[0]);
+    userEvent.click(screen.getAllByRole("button", { name: /add to cart/i })[0]);
     expect(screen.getAllByText(/3\s?400/).length).toBeGreaterThan(0);
   });
 });
@@ -188,6 +197,7 @@ describe("Cart state", () => {
 // Order confirmation
 // ---------------------------------------------------------------------------
 describe("Order confirmation", () => {
+  // Adds item id=1 to the cart then confirms — the POST body should contain variantId:1.
   test("confirm order sends POST /api/orders with correct variantIds and quantities", async () => {
     const fetchOrders = jest.fn().mockResolvedValue();
     global.fetch = jest.fn().mockResolvedValue({
@@ -196,7 +206,7 @@ describe("Order confirmation", () => {
     });
     renderTab({ fetchOrders });
 
-    userEvent.click(screen.getAllByRole("button", { name: /add to cart/i })[0]); // variant id=1
+    userEvent.click(screen.getAllByRole("button", { name: /add to cart/i })[0]);
     userEvent.click(screen.getByRole("button", { name: /confirm order/i }));
 
     await waitFor(() => {
@@ -228,6 +238,7 @@ describe("Order confirmation", () => {
     delete global.fetch;
   });
 
+  // The cart must be preserved on failure so the user can retry without re-adding items.
   test("failed order calls onError and does not clear the cart", async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: false,
@@ -241,7 +252,6 @@ describe("Order confirmation", () => {
     await waitFor(() => {
       expect(onError).toHaveBeenCalledWith(expect.stringContaining("Insufficient stock"));
     });
-    // Cart still has the item
     expect(screen.queryByText(/your cart is empty/i)).not.toBeInTheDocument();
 
     delete global.fetch;

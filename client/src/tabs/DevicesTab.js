@@ -2,6 +2,28 @@ import { useEffect, useMemo, useState } from "react";
 
 const DEFAULT_FORM = { name: "", type: "Laptop", ownerId: "" };
 
+/**
+ * Tab for browsing, creating, editing, and deleting devices.
+ *
+ * Receives both the device list and the employee list from App. Filtering is applied
+ * locally across three axes: device type, owner, and free-text search — all persisted
+ * to localStorage. Because the device records only store owner_id, a secondary async
+ * effect resolves each visible owner's name via GET /api/employees/:id and caches the
+ * result in ownerNameById. Resolutions are fired in parallel and failures are gracefully
+ * shown as "Unknown employee #id" rather than blocking the table. Create and edit share
+ * a single form; mutations call back to App via fetchDevices and fetchEmployees so the
+ * parent can refresh device counts on employee rows.
+ *
+ * @param {Object}   props
+ * @param {Array}    props.devices         - Full device list from the server.
+ * @param {Array}    props.employees       - Full employee list, used to populate the owner select.
+ * @param {boolean}  props.loadingDevices  - Whether App is currently fetching devices.
+ * @param {Function} props.fetchDevices    - Callback to refresh the device list in App.
+ * @param {Function} props.fetchEmployees  - Callback to refresh employees (device counts change).
+ * @param {Function} props.onError         - Callback to surface error messages in the global banner.
+ * @param {Function} props.onStatusMessage - Callback to show a transient success message.
+ * @returns {JSX.Element}
+ */
 export default function DevicesTab({
   devices,
   employees,
@@ -24,12 +46,14 @@ export default function DevicesTab({
   const [ownerNameById, setOwnerNameById] = useState({});
   const [loadingOwnerNames, setLoadingOwnerNames] = useState(false);
 
+  // Derive unique device types from the current device list for the type filter dropdown
   const deviceTypeOptions = useMemo(() => {
     const set = new Set();
     devices.forEach((d) => { if (d.type) set.add(d.type); });
     return Array.from(set);
   }, [devices]);
 
+  // Persist filter selections to localStorage whenever they change
   useEffect(() => {
     window.localStorage.setItem("fleet_device_type_filter", deviceTypeFilter);
   }, [deviceTypeFilter]);
@@ -38,6 +62,7 @@ export default function DevicesTab({
     window.localStorage.setItem("fleet_device_owner_filter", deviceOwnerFilter);
   }, [deviceOwnerFilter]);
 
+  // Recompute the filtered device list whenever the source data or any filter changes
   useEffect(() => {
     let next = [...devices];
     if (deviceTypeFilter) {
@@ -56,6 +81,8 @@ export default function DevicesTab({
     setFilteredDevices(next);
   }, [devices, deviceTypeFilter, deviceOwnerFilter, deviceSearch]);
 
+  // Resolve owner names for all visible devices in parallel whenever filteredDevices changes.
+  // Each owner_id is fetched individually; 404s and network errors fall back to a placeholder.
   useEffect(() => {
     const ownerIds = Array.from(
       new Set(
@@ -84,6 +111,7 @@ export default function DevicesTab({
           const json = await response.json();
           return { ownerId: String(ownerId), ownerName: json.name };
         } catch {
+          // Individual failures use a placeholder so the rest of the table still renders
           return { ownerId: String(ownerId), ownerName: `Unknown employee #${ownerId}` };
         }
       }),
@@ -96,6 +124,15 @@ export default function DevicesTab({
       .finally(() => setLoadingOwnerNames(false));
   }, [filteredDevices]);
 
+  /**
+   * Handles both create (POST) and update (PUT) form submissions.
+   * The target URL and HTTP method are derived from whether editingId is set.
+   * On success the form is reset, the editing state is cleared, and both
+   * fetchDevices and fetchEmployees are called to keep the parent in sync.
+   *
+   * @param {React.FormEvent} event
+   * @returns {Promise<void>}
+   */
   async function handleSubmit(event) {
     event.preventDefault();
     const isEditing = Boolean(editingId);
@@ -110,6 +147,7 @@ export default function DevicesTab({
       const json = await response.json();
       if (!response.ok) throw new Error(json.message || "Could not save device");
       onStatusMessage(isEditing ? "Device updated" : "Device created");
+      // Reset form and exit edit mode after a successful save
       setForm(DEFAULT_FORM);
       setEditingId(null);
       await fetchDevices();
@@ -119,6 +157,14 @@ export default function DevicesTab({
     }
   }
 
+  /**
+   * Prompts the user for confirmation then sends DELETE /api/devices/:id.
+   * After a successful deletion, both fetchDevices and fetchEmployees are called
+   * so the parent can update device counts on employee rows.
+   *
+   * @param {number} deviceId - ID of the device to delete.
+   * @returns {Promise<void>}
+   */
   async function handleDelete(deviceId) {
     if (!window.confirm("Delete this device?")) return;
     try {
@@ -135,15 +181,24 @@ export default function DevicesTab({
     }
   }
 
+  /**
+   * Enters edit mode for the given device, pre-filling the form with its data.
+   *
+   * @param {{ id: number, name: string, type: string, owner_id: number|null }} device
+   */
   function beginEdit(device) {
     setEditingId(device.id);
     setForm({
       name: device.name || "",
       type: device.type || "Laptop",
+      // Coerce owner_id to a string to match the select option values
       ownerId: device.owner_id ? String(device.owner_id) : "",
     });
   }
 
+  /**
+   * Exits edit mode and resets the form to its empty default state.
+   */
   function cancelEdit() {
     setForm(DEFAULT_FORM);
     setEditingId(null);

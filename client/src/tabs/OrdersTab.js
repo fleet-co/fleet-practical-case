@@ -1,3 +1,18 @@
+/**
+ * Read-only tab that displays the order history.
+ *
+ * Each order is rendered as a card showing its ID, creation date, a line-item
+ * table with unit prices and subtotals, and a computed grand total. The total is
+ * derived client-side from unit_price × quantity for each item rather than relying
+ * on a server-provided field, so it stays accurate even if the API payload changes.
+ * This component owns no state and makes no network calls — all data is provided
+ * by App via props.
+ *
+ * @param {Object}  props
+ * @param {Array}   props.orders        - List of orders, each with an items array of line items.
+ * @param {boolean} props.loadingOrders - Whether App is currently fetching orders.
+ * @returns {JSX.Element}
+ */
 export default function OrdersTab({ orders, loadingOrders }) {
   return (
     <section className="panel">
@@ -7,6 +22,7 @@ export default function OrdersTab({ orders, loadingOrders }) {
       ) : (
         <div className="orders-list">
           {orders.map((order) => {
+            // Compute the order total client-side from line items
             const total = order.items.reduce(
               (sum, item) => sum + item.unit_price * item.quantity,
               0,

@@ -1,12 +1,24 @@
 const request = require("supertest");
 const { createTestApp, seed } = require("../testDb");
 
+/**
+ * Integration tests for the catalog API endpoints.
+ *
+ * Each test runs against an isolated in-memory SQLite database created once
+ * per suite (beforeAll) and re-seeded before every test (beforeEach) so that
+ * mutations in one test never affect another. The fixture includes two active
+ * products with multiple variants and one inactive product to verify that the
+ * default status filter and effective_price computation work correctly.
+ */
+
+// Products — two active, one inactive, each with distinct base prices
 const PRODUCTS = [
   { id: 1, name: "MacBook Pro", status: "active", base_price: 1500 },
   { id: 2, name: "LG Display", status: "active", base_price: 400 },
   { id: 3, name: "Legacy Item", status: "inactive", base_price: 100 },
 ];
 
+// Variants — product 1 has 2 variants, product 2 has 1, product 3 (inactive) has 1
 const VARIANTS = [
   { id: 1, product_id: 1, configuration: "M3 Pro / 18GB", sku: "MBP-M3P-18", price_delta: 200, stock: 5 },
   { id: 2, product_id: 1, configuration: "M3 Max / 36GB", sku: "MBP-M3M-36", price_delta: 800, stock: 3 },
@@ -30,10 +42,10 @@ afterAll(() => new Promise((resolve) => db.close(resolve)));
 // GET /api/catalog
 // ---------------------------------------------------------------------------
 describe("GET /api/catalog", () => {
+  // 3 active variants: 2 from MacBook Pro, 1 from LG Display; Legacy Item (inactive) is excluded.
   test("returns only active product variants by default", async () => {
     const res = await request(app).get("/api/catalog");
     expect(res.status).toBe(200);
-    // 3 active variants (product 1 has 2, product 2 has 1; product 3 is inactive)
     expect(res.body).toHaveLength(3);
     res.body.forEach((item) => expect(item.status).toBe("active"));
   });
@@ -50,6 +62,7 @@ describe("GET /api/catalog", () => {
     expect(res.body[0].sku).toBe("LEG-STD");
   });
 
+  // effective_price = base_price + price_delta for each variant.
   test("effective_price equals base_price + price_delta", async () => {
     const res = await request(app).get("/api/catalog");
     const mbpM3Pro = res.body.find((item) => item.sku === "MBP-M3P-18");
@@ -105,6 +118,7 @@ describe("GET /api/catalog/:id", () => {
     expect(res.body.configuration).toBe("M3 Pro / 18GB");
   });
 
+  // Variant 2: base_price 1500 + price_delta 800 = 2300.
   test("effective_price is correct for the returned variant", async () => {
     const res = await request(app).get("/api/catalog/2");
     expect(res.body.effective_price).toBe(1500 + 800);

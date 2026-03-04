@@ -2,6 +2,25 @@ import { useEffect, useMemo, useState } from "react";
 
 const DEFAULT_FORM = { name: "", role: "" };
 
+/**
+ * Tab for browsing, creating, editing, and deleting employees.
+ *
+ * Receives the full employee list from App and applies role filtering and
+ * free-text search locally. The role filter is persisted to localStorage so
+ * it survives page refreshes. Create and edit share a single form whose heading
+ * and submit button label change depending on whether editingId is set. Mutations
+ * (POST / PUT / DELETE) call back to App via fetchEmployees and fetchDevices so
+ * the parent can refresh its shared state after a change.
+ *
+ * @param {Object}   props
+ * @param {Array}    props.employees        - Full employee list from the server.
+ * @param {boolean}  props.loadingEmployees - Whether App is currently fetching employees.
+ * @param {Function} props.fetchEmployees   - Callback to refresh the employee list in App.
+ * @param {Function} props.fetchDevices     - Callback to refresh devices (counts change after mutations).
+ * @param {Function} props.onError          - Callback to surface error messages in the global banner.
+ * @param {Function} props.onStatusMessage  - Callback to show a transient success message.
+ * @returns {JSX.Element}
+ */
 export default function EmployeesTab({
   employees,
   loadingEmployees,
@@ -18,16 +37,19 @@ export default function EmployeesTab({
   const [form, setForm] = useState(DEFAULT_FORM);
   const [editingId, setEditingId] = useState(null);
 
+  // Derive the unique role options from the current employee list
   const roleOptions = useMemo(() => {
     const set = new Set();
     employees.forEach((e) => { if (e.role) set.add(e.role); });
     return Array.from(set);
   }, [employees]);
 
+  // Persist the role filter to localStorage whenever it changes
   useEffect(() => {
     window.localStorage.setItem("fleet_role_filter", roleFilter);
   }, [roleFilter]);
 
+  // Recompute the filtered list whenever employees, role filter, or search term changes
   useEffect(() => {
     let next = [...employees];
     if (roleFilter) {
@@ -43,6 +65,15 @@ export default function EmployeesTab({
     setFilteredEmployees(next);
   }, [employees, roleFilter, employeeSearch]);
 
+  /**
+   * Handles both create (POST) and update (PUT) form submissions.
+   * The target URL and HTTP method are derived from whether editingId is set.
+   * On success the form is reset, the editing state is cleared, and both
+   * fetchEmployees and fetchDevices are called to keep the parent in sync.
+   *
+   * @param {React.FormEvent} event
+   * @returns {Promise<void>}
+   */
   async function handleSubmit(event) {
     event.preventDefault();
     const isEditing = Boolean(editingId);
@@ -57,6 +88,7 @@ export default function EmployeesTab({
       const json = await response.json();
       if (!response.ok) throw new Error(json.message || "Could not save employee");
       onStatusMessage(isEditing ? "Employee updated" : "Employee created");
+      // Reset form and exit edit mode after a successful save
       setForm(DEFAULT_FORM);
       setEditingId(null);
       await fetchEmployees();
@@ -66,6 +98,13 @@ export default function EmployeesTab({
     }
   }
 
+  /**
+   * Prompts the user for confirmation then sends DELETE /api/employees/:id.
+   * After a successful deletion, fetchEmployees is called to refresh the list.
+   *
+   * @param {number} employeeId - ID of the employee to delete.
+   * @returns {Promise<void>}
+   */
   async function handleDelete(employeeId) {
     if (!window.confirm("Delete employee and unassign their devices?")) return;
     try {
@@ -81,11 +120,19 @@ export default function EmployeesTab({
     }
   }
 
+  /**
+   * Enters edit mode for the given employee, pre-filling the form with their data.
+   *
+   * @param {{ id: number, name: string, role: string }} employee
+   */
   function beginEdit(employee) {
     setEditingId(employee.id);
     setForm({ name: employee.name || "", role: employee.role || "" });
   }
 
+  /**
+   * Exits edit mode and resets the form to its empty default state.
+   */
   function cancelEdit() {
     setForm(DEFAULT_FORM);
     setEditingId(null);

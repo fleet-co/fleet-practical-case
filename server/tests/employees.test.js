@@ -1,12 +1,24 @@
 const request = require("supertest");
 const { createTestApp, seed, get, all } = require("../testDb");
 
+/**
+ * Integration tests for the employee API endpoints.
+ *
+ * Each test runs against an isolated in-memory SQLite database created once
+ * per suite (beforeAll) and re-seeded before every test (beforeEach) so that
+ * mutations in one test never affect another. The DEVICES fixture is included
+ * alongside EMPLOYEES to exercise the device_count join and the owner-unassign
+ * behaviour on DELETE.
+ */
+
+// Fixtures — two Engineers and one Designer to exercise role-based filtering
 const EMPLOYEES = [
   { id: 1, name: "Alice Martin", role: "Engineer" },
   { id: 2, name: "Bob Chen", role: "Designer" },
   { id: 3, name: "Carol Dupont", role: "Engineer" },
 ];
 
+// Alice owns two devices, Bob owns none — used to verify device_count aggregation
 const DEVICES = [
   { id: 1, name: "MacBook Pro", type: "Laptop", ownerId: 1 },
   { id: 2, name: "LG Display", type: "Display", ownerId: 1 },
@@ -35,6 +47,7 @@ describe("GET /api/employees", () => {
     expect(res.body).toHaveLength(3);
   });
 
+  // Alice (id=1) owns 2 devices; Bob (id=2) owns none.
   test("includes device_count for each employee", async () => {
     const res = await request(app).get("/api/employees");
     const alice = res.body.find((e) => e.id === 1);
@@ -177,8 +190,8 @@ describe("DELETE /api/employees/:id", () => {
     expect(res.body.some((e) => e.id === 2)).toBe(false);
   });
 
+  // Alice (id=1) owns devices 1 and 2 — both should have owner_id set to NULL after deletion.
   test("unassigns the deleted employee's devices (owner_id set to NULL)", async () => {
-    // Alice (id=1) owns devices 1 and 2
     await request(app).delete("/api/employees/1");
     const device1 = await get(db, "SELECT owner_id FROM devices WHERE id = 1");
     const device2 = await get(db, "SELECT owner_id FROM devices WHERE id = 2");

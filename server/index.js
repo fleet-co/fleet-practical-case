@@ -5,6 +5,7 @@ const { createApp } = require("./app");
 const PORT = process.env.PORT || 3001;
 const dbPath = path.join(__dirname, "fleet.sqlite");
 
+// Open the persistent SQLite database file, then hand the connection to createApp
 const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
     console.error("Could not open sqlite database", err);
