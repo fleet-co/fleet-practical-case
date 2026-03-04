@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import "./App.css";
-import EmployeesTab from "./EmployeesTab";
-import DevicesTab from "./DevicesTab";
-import CatalogTab from "./CatalogTab";
-import OrdersTab from "./OrdersTab";
+import EmployeesTab from "./tabs/EmployeesTab";
+import DevicesTab from "./tabs/DevicesTab";
+import CatalogTab from "./tabs/CatalogTab";
+import OrdersTab from "./tabs/OrdersTab";
 
 const VALID_TABS = ["employees", "devices", "catalog", "orders"];
 
