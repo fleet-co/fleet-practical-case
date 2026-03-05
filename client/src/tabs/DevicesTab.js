@@ -82,7 +82,7 @@ export default function DevicesTab({
   }, [devices, deviceTypeFilter, deviceOwnerFilter, deviceSearch]);
 
   // Resolve owner names for all visible devices in parallel whenever filteredDevices changes.
-  // Each owner_id is fetched individually; 404s and network errors fall back to a placeholder.
+  // Each owner_id is fetched individually; 404s and network errors are handled gracefully.
   useEffect(() => {
     const ownerIds = Array.from(
       new Set(
@@ -105,7 +105,7 @@ export default function DevicesTab({
         try {
           const response = await fetch(`/api/employees/${ownerId}`);
           if (response.status === 404) {
-            return { ownerId: String(ownerId), ownerName: `Unknown employee #${ownerId}` };
+            return { ownerId: String(ownerId), ownerName: null };
           }
           if (!response.ok) throw new Error(`Failed to resolve owner ${ownerId}`);
           const json = await response.json();
@@ -118,7 +118,7 @@ export default function DevicesTab({
     )
       .then((resolved) => {
         const map = {};
-        resolved.forEach(({ ownerId, ownerName }) => { map[ownerId] = ownerName; });
+        resolved.filter(({ ownerId, ownerName }) => ownerName !== null).forEach(({ ownerId, ownerName }) => { map[ownerId] = ownerName; });
         setOwnerNameById(map);
       })
       .finally(() => setLoadingOwnerNames(false));
