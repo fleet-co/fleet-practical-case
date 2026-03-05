@@ -43,7 +43,6 @@ export default function DevicesTab({
   const [deviceSearch, setDeviceSearch] = useState("");
   const [form, setForm] = useState(DEFAULT_FORM);
   const [editingId, setEditingId] = useState(null);
-  const [ownerNameById, setOwnerNameById] = useState({});
   const [loadingOwnerNames, setLoadingOwnerNames] = useState(false);
 
   // Derive unique device types from the current device list for the type filter dropdown
@@ -52,6 +51,28 @@ export default function DevicesTab({
     devices.forEach((d) => { if (d.type) set.add(d.type); });
     return Array.from(set);
   }, [devices]);
+
+  // Derive device owner names from the current employees list for the Owner column
+  const ownerNameById = useMemo(() => {
+    const set = new Set();
+    devices.forEach((d) => { 
+      const owner = employees.find((e) => e.id === d.owner_id);
+      if (owner) {
+        set.add({ownerId: owner.id, ownerName: owner.name});
+      }
+    });
+    const arr = Array.from(set);
+    console.log(`arr: ${JSON.stringify(arr)}`)
+    const dic = {}
+    for (let i = 0; i < arr.length; i++) {
+      const couple = arr[i]
+      dic[couple.ownerId] = couple.ownerName
+    } 
+    return dic
+  }, [devices, employees]);
+
+  console.log(`ownerNameById: ${JSON.stringify(ownerNameById)}`);
+  console.log(`ownername ${ownerNameById["80"]}`);
 
   // Persist filter selections to localStorage whenever they change
   useEffect(() => {
@@ -80,49 +101,6 @@ export default function DevicesTab({
     }
     setFilteredDevices(next);
   }, [devices, deviceTypeFilter, deviceOwnerFilter, deviceSearch]);
-
-  // Resolve owner names for all visible devices in parallel whenever filteredDevices changes.
-  // Each owner_id is fetched individually; 404s and network errors are handled gracefully.
-  useEffect(() => {
-    const ownerIds = Array.from(
-      new Set(
-        filteredDevices
-          .map((d) => Number(d.owner_id))
-          .filter((id) => Number.isInteger(id) && id > 0),
-      ),
-    );
-
-    if (ownerIds.length === 0) {
-      setOwnerNameById({});
-      return;
-    }
-
-    setLoadingOwnerNames(true);
-    setOwnerNameById({});
-
-    Promise.all(
-      ownerIds.map(async (ownerId) => {
-        try {
-          const response = await fetch(`/api/employees/${ownerId}`);
-          if (response.status === 404) {
-            return { ownerId: String(ownerId), ownerName: null };
-          }
-          if (!response.ok) throw new Error(`Failed to resolve owner ${ownerId}`);
-          const json = await response.json();
-          return { ownerId: String(ownerId), ownerName: json.name };
-        } catch {
-          // Individual failures use a placeholder so the rest of the table still renders
-          return { ownerId: String(ownerId), ownerName: `Unknown employee #${ownerId}` };
-        }
-      }),
-    )
-      .then((resolved) => {
-        const map = {};
-        resolved.filter(({ ownerId, ownerName }) => ownerName !== null).forEach(({ ownerId, ownerName }) => { map[ownerId] = ownerName; });
-        setOwnerNameById(map);
-      })
-      .finally(() => setLoadingOwnerNames(false));
-  }, [filteredDevices]);
 
   /**
    * Handles both create (POST) and update (PUT) form submissions.
