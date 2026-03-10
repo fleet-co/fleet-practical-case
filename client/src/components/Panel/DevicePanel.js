@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import "./Panel.css";
+import DataTable from "./DataTable";
 import { useEmployees } from "../../hooks/useEmployees";
 import {
   useDevices,
@@ -202,40 +203,21 @@ function DevicePanel() {
       </div>
 
       <h3>Device list {isLoading ? "(loading...)" : ""}</h3>
-      <table>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Type</th>
-            <th>Owner</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filteredDevices.map((device) => (
-            <tr key={device.id}>
-              <td>{device.name}</td>
-              <td>{device.type}</td>
-              <td>
-                {employeeById[String(device.owner_id)] || "Unassigned"}
-              </td>
-              <td>
-                <button type="button" onClick={() => beginEdit(device)}>
-                  Edit
-                </button>
-                <button type="button" onClick={() => handleDelete(device.id)}>
-                  Delete
-                </button>
-              </td>
-            </tr>
-          ))}
-          {filteredDevices.length === 0 ? (
-            <tr>
-              <td colSpan="4">No devices found</td>
-            </tr>
-          ) : null}
-        </tbody>
-      </table>
+      <DataTable
+        columns={[
+          { key: "name", header: "Name" },
+          { key: "type", header: "Type" },
+          {
+            key: "owner",
+            header: "Owner",
+            render: (d) => employeeById[String(d.owner_id)] || "Unassigned",
+          },
+        ]}
+        data={filteredDevices}
+        onEdit={beginEdit}
+        onDelete={handleDelete}
+        emptyMessage="No devices found"
+      />
     </section>
   );
 }

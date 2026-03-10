@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import "./Panel.css";
+import DataTable from "./DataTable";
 import {
   useEmployees,
   useCreateEmployee,
@@ -138,38 +139,17 @@ function EmployeePanel() {
       </div>
 
       <h3>Employee list {isLoading ? "(loading...)" : ""}</h3>
-      <table>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Role</th>
-            <th>Devices</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filteredEmployees.map((employee) => (
-            <tr key={employee.id}>
-              <td>{employee.name}</td>
-              <td>{employee.role}</td>
-              <td>{employee.device_count || 0}</td>
-              <td>
-                <button type="button" onClick={() => beginEdit(employee)}>
-                  Edit
-                </button>
-                <button type="button" onClick={() => handleDelete(employee.id)}>
-                  Delete
-                </button>
-              </td>
-            </tr>
-          ))}
-          {filteredEmployees.length === 0 ? (
-            <tr>
-              <td colSpan="4">No employees found</td>
-            </tr>
-          ) : null}
-        </tbody>
-      </table>
+      <DataTable
+        columns={[
+          { key: "name", header: "Name" },
+          { key: "role", header: "Role" },
+          { key: "device_count", header: "Devices", render: (e) => e.device_count || 0 },
+        ]}
+        data={filteredEmployees}
+        onEdit={beginEdit}
+        onDelete={handleDelete}
+        emptyMessage="No employees found"
+      />
     </section>
   );
 }
