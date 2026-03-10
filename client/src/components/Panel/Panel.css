@@ -26,6 +26,12 @@
   padding: 8px;
 }
 
+.field-error {
+  color: #d32f2f;
+  font-size: 12px;
+  font-weight: 400;
+}
+
 .form-buttons {
   display: flex;
   align-items: center;

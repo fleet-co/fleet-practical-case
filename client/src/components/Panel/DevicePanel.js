@@ -1,4 +1,7 @@
 import { useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import "./Panel.css";
 import DataTable from "./DataTable";
 import { useEmployees } from "../../hooks/useEmployees";
@@ -9,7 +12,11 @@ import {
   useDeleteDevice,
 } from "../../hooks/useDevices";
 
-const DEFAULT_FORM = { name: "", type: "Laptop", ownerId: "" };
+const deviceSchema = z.object({
+  name: z.string().min(1),
+  type: z.enum(["Laptop", "Peripheral", "Display", "Mobile"]),
+  ownerId: z.string(),
+});
 
 function DevicePanel() {
   const { data: employees = [] } = useEmployees();
@@ -18,7 +25,16 @@ function DevicePanel() {
   const updateMutation = useUpdateDevice();
   const deleteMutation = useDeleteDevice();
 
-  const [deviceForm, setDeviceForm] = useState(DEFAULT_FORM);
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm({
+    resolver: zodResolver(deviceSchema),
+    defaultValues: { name: "", type: "Laptop", ownerId: "" },
+  });
+
   const [editingId, setEditingId] = useState(null);
   const [typeFilter, setTypeFilter] = useState(
     () => window.localStorage.getItem("fleet_device_type_filter") || "",
@@ -71,20 +87,15 @@ function DevicePanel() {
     window.localStorage.setItem("fleet_device_owner_filter", value);
   }
 
-  async function handleSubmit(event) {
-    event.preventDefault();
-    const payload = {
-      name: deviceForm.name,
-      type: deviceForm.type,
-      ownerId: deviceForm.ownerId || null,
-    };
+  async function onSubmit(data) {
+    const payload = { ...data, ownerId: data.ownerId || null };
 
     if (editingId) {
       await updateMutation.mutateAsync({ id: editingId, ...payload });
     } else {
       await createMutation.mutateAsync(payload);
     }
-    setDeviceForm(DEFAULT_FORM);
+    reset();
     setEditingId(null);
   }
 
@@ -95,41 +106,30 @@ function DevicePanel() {
 
   function beginEdit(device) {
     setEditingId(device.id);
-    setDeviceForm({
+    reset({
       name: device.name || "",
       type: device.type || "Laptop",
       ownerId: device.owner_id ? String(device.owner_id) : "",
-    });
+    }, { keepDefaultValues: true });
   }
 
   function cancelEdit() {
-    setDeviceForm(DEFAULT_FORM);
+    reset();
     setEditingId(null);
   }
 
   return (
     <section className="panel">
       <h2>{editingId ? "Edit device" : "Create device"}</h2>
-      <form className="app-form" onSubmit={handleSubmit}>
+      <form className="app-form" onSubmit={handleSubmit(onSubmit)}>
         <label>
           Device name
-          <input
-            value={deviceForm.name}
-            onChange={(e) =>
-              setDeviceForm((prev) => ({ ...prev, name: e.target.value }))
-            }
-            placeholder="MacBook Pro"
-            required
-          />
+          <input {...register("name")} placeholder="MacBook Pro" />
+          {errors.name && <span className="field-error">{errors.name.message}</span>}
         </label>
         <label>
           Type
-          <select
-            value={deviceForm.type}
-            onChange={(e) =>
-              setDeviceForm((prev) => ({ ...prev, type: e.target.value }))
-            }
-          >
+          <select {...register("type")}>
             <option value="Laptop">Laptop</option>
             <option value="Peripheral">Peripheral</option>
             <option value="Display">Display</option>
@@ -138,12 +138,7 @@ function DevicePanel() {
         </label>
         <label>
           Owner
-          <select
-            value={deviceForm.ownerId}
-            onChange={(e) =>
-              setDeviceForm((prev) => ({ ...prev, ownerId: e.target.value }))
-            }
-          >
+          <select {...register("ownerId")}>
             <option value="">Unassigned</option>
             {employees.map((employee) => (
               <option key={employee.id} value={employee.id}>

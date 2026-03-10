@@ -1,4 +1,7 @@
 import { useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import "./Panel.css";
 import DataTable from "./DataTable";
 import {
@@ -8,7 +11,10 @@ import {
   useDeleteEmployee,
 } from "../../hooks/useEmployees";
 
-const DEFAULT_FORM = { name: "", role: "" };
+const employeeSchema = z.object({
+  name: z.string().min(1),
+  role: z.string().min(1),
+});
 
 function EmployeePanel() {
   const { data: employees = [], isLoading } = useEmployees();
@@ -16,7 +22,16 @@ function EmployeePanel() {
   const updateMutation = useUpdateEmployee();
   const deleteMutation = useDeleteEmployee();
 
-  const [employeeForm, setEmployeeForm] = useState(DEFAULT_FORM);
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm({
+    resolver: zodResolver(employeeSchema),
+    defaultValues: { name: "", role: "" },
+  });
+
   const [editingId, setEditingId] = useState(null);
   const [roleFilter, setRoleFilter] = useState(
     () => window.localStorage.getItem("fleet_role_filter") || "",
@@ -48,16 +63,13 @@ function EmployeePanel() {
     window.localStorage.setItem("fleet_role_filter", value);
   }
 
-  async function handleSubmit(event) {
-    event.preventDefault();
-    const payload = { name: employeeForm.name, role: employeeForm.role };
-
+  async function onSubmit(data) {
     if (editingId) {
-      await updateMutation.mutateAsync({ id: editingId, ...payload });
+      await updateMutation.mutateAsync({ id: editingId, ...data });
     } else {
-      await createMutation.mutateAsync(payload);
+      await createMutation.mutateAsync(data);
     }
-    setEmployeeForm(DEFAULT_FORM);
+    reset();
     setEditingId(null);
   }
 
@@ -68,39 +80,27 @@ function EmployeePanel() {
 
   function beginEdit(employee) {
     setEditingId(employee.id);
-    setEmployeeForm({ name: employee.name || "", role: employee.role || "" });
+    reset({ name: employee.name || "", role: employee.role || "" }, { keepDefaultValues: true });
   }
 
   function cancelEdit() {
-    setEmployeeForm(DEFAULT_FORM);
+    reset();
     setEditingId(null);
   }
 
   return (
     <section className="panel">
       <h2>{editingId ? "Edit employee" : "Create employee"}</h2>
-      <form className="app-form" onSubmit={handleSubmit}>
+      <form className="app-form" onSubmit={handleSubmit(onSubmit)}>
         <label>
           Name
-          <input
-            value={employeeForm.name}
-            onChange={(e) =>
-              setEmployeeForm((prev) => ({ ...prev, name: e.target.value }))
-            }
-            placeholder="Employee name"
-            required
-          />
+          <input {...register("name")} placeholder="Employee name" />
+          {errors.name && <span className="field-error">{errors.name.message}</span>}
         </label>
         <label>
           Role
-          <input
-            value={employeeForm.role}
-            onChange={(e) =>
-              setEmployeeForm((prev) => ({ ...prev, role: e.target.value }))
-            }
-            placeholder="Developer"
-            required
-          />
+          <input {...register("role")} placeholder="Developer" />
+          {errors.role && <span className="field-error">{errors.role.message}</span>}
         </label>
         <div className="form-buttons">
           <button type="submit">{editingId ? "Update" : "Create"}</button>
