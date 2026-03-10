@@ -1,0 +1,22 @@
+.app-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.tab-button {
+  border: 1px solid #7c8a99;
+  border-radius: 4px;
+  padding: 8px;
+  background: #ffffff;
+  text-decoration: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.tab-button.active {
+  background: #24323f;
+  color: #ffffff;
+}

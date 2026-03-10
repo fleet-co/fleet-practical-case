@@ -1,0 +1,24 @@
+.app-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.app-kpis article {
+  background: #f4f8ff;
+  border: 1px solid #dce7f7;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.app-kpis h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  text-transform: uppercase;
+  color: #5c6a79;
+}
+
+.app-kpis strong {
+  font-size: 24px;
+}

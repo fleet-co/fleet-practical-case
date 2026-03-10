@@ -1,0 +1,27 @@
+.status {
+  border-radius: 6px;
+  padding: 10px;
+  margin: 8px 0;
+}
+
+.status.success {
+  background: #e9fff0;
+  border: 1px solid #a7ddb4;
+}
+
+.status.error {
+  background: #fff0f0;
+  border: 1px solid #efb4b4;
+}
+
+.error-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.timestamp {
+  color: #647282;
+  font-size: 12px;
+  margin-bottom: 12px;
+}
