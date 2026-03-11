@@ -1,4 +1,4 @@
-function DataTable({ columns, data, onEdit, onDelete, emptyMessage }) {
+function DataTable({ columns, data, onEdit, onDelete, extraAction, emptyMessage }) {
   return (
     <table>
       <thead>
@@ -22,6 +22,7 @@ function DataTable({ columns, data, onEdit, onDelete, emptyMessage }) {
               <button type="button" onClick={() => onDelete(item.id)}>
                 Delete
               </button>
+              {extraAction ? extraAction(item) : null}
             </td>
           </tr>
         ))}

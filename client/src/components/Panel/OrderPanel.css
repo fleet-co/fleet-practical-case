@@ -1,0 +1,34 @@
+.order-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.order-card {
+  border: 1px solid #d8e1ec;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.order-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.order-status {
+  background: #e8f5e9;
+  color: #2e7d32;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.order-total {
+  margin-left: auto;
+  font-weight: 700;
+  font-size: 16px;
+}

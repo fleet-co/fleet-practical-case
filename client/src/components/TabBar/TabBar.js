@@ -20,6 +20,22 @@ function TabBar({ onRefresh }) {
       >
         Devices
       </NavLink>
+      <NavLink
+        to="/catalog"
+        className={({ isActive }) =>
+          isActive ? "tab-button active" : "tab-button"
+        }
+      >
+        Catalog
+      </NavLink>
+      <NavLink
+        to="/orders"
+        className={({ isActive }) =>
+          isActive ? "tab-button active" : "tab-button"
+        }
+      >
+        Orders
+      </NavLink>
       <button type="button" onClick={onRefresh}>
         Manual refresh
       </button>

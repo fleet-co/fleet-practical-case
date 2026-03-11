@@ -7,6 +7,8 @@ import TabBar from "./components/TabBar/TabBar";
 import StatusMessages from "./components/StatusMessages/StatusMessages";
 import EmployeePanel from "./components/Panel/EmployeePanel";
 import DevicePanel from "./components/Panel/DevicePanel";
+import CatalogPanel from "./components/Panel/CatalogPanel";
+import OrderPanel from "./components/Panel/OrderPanel";
 import { useEmployees } from "./hooks/useEmployees";
 import { useDevices } from "./hooks/useDevices";
 
@@ -45,6 +47,8 @@ function App() {
   function handleRefresh() {
     queryClient.invalidateQueries({ queryKey: ["employees"] });
     queryClient.invalidateQueries({ queryKey: ["devices"] });
+    queryClient.invalidateQueries({ queryKey: ["products"] });
+    queryClient.invalidateQueries({ queryKey: ["orders"] });
   }
 
   return (
@@ -72,6 +76,8 @@ function App() {
         <Routes>
           <Route path="/employees" element={<EmployeePanel />} />
           <Route path="/devices" element={<DevicePanel />} />
+          <Route path="/catalog" element={<CatalogPanel />} />
+          <Route path="/orders" element={<OrderPanel />} />
           <Route path="*" element={<Navigate to="/employees" replace />} />
         </Routes>
       </main>
