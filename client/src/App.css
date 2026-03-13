@@ -1,5 +1,5 @@
 .app-page {
-  max-width: 1100px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 16px;
   color: #17212b;
@@ -16,6 +16,7 @@
   color: #4a5967;
 }
 
+/* KPIs */
 .app-kpis {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -41,6 +42,7 @@
   font-size: 24px;
 }
 
+/* Navigation */
 .app-controls {
   display: flex;
   align-items: center;
@@ -51,6 +53,12 @@
 .tab-button {
   border: 1px solid #7c8a99;
   background: #ffffff;
+  text-decoration: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  color: #17212b;
+  font-size: 14px;
+  cursor: pointer;
 }
 
 .tab-button.active {
@@ -58,6 +66,7 @@
   color: #ffffff;
 }
 
+/* Status */
 .status {
   border-radius: 6px;
   padding: 10px;
@@ -80,12 +89,7 @@
   align-items: center;
 }
 
-.timestamp {
-  color: #647282;
-  font-size: 12px;
-  margin-bottom: 12px;
-}
-
+/* Main layout */
 .app-main {
   display: grid;
   grid-template-columns: 1fr;
@@ -99,6 +103,7 @@
   padding: 14px;
 }
 
+/* Forms */
 .app-form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -128,6 +133,13 @@ button {
   grid-column: 1 / -1;
 }
 
+.field-error {
+  color: #d32f2f;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+/* Filters */
 .filters {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -141,6 +153,12 @@ button {
   gap: 4px;
   font-weight: 600;
   font-size: 13px;
+}
+
+/* Tables */
+.table-scroll {
+  max-height: 400px;
+  overflow-y: auto;
 }
 
 table {
@@ -160,10 +178,174 @@ th {
   background: #eef3fa;
 }
 
+.product-description {
+  font-size: 12px;
+  color: #647282;
+  margin-top: 2px;
+}
+
+/* Catalog layout with cart sidebar */
+.catalog-layout {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 16px;
+  align-items: start;
+}
+
+.catalog-main {
+  min-width: 0;
+}
+
+/* Cart sidebar */
+.cart-sidebar {
+  background: #ffffff;
+  border: 1px solid #d8e1ec;
+  border-radius: 8px;
+  padding: 14px;
+  position: sticky;
+  top: 16px;
+}
+
+.cart-sidebar h3 {
+  margin: 0 0 12px;
+}
+
+.cart-empty {
+  color: #647282;
+  font-size: 14px;
+}
+
+.cart-items {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px;
+}
+
+.cart-item {
+  padding: 8px 0;
+  border-bottom: 1px solid #eef3fa;
+}
+
+.cart-item:last-child {
+  border-bottom: none;
+}
+
+.cart-item-info {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+
+.cart-item-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.cart-item-controls button {
+  padding: 2px 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.cart-remove {
+  margin-left: auto;
+  color: #d32f2f;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.cart-total {
+  padding: 8px 0;
+  border-top: 2px solid #24323f;
+  text-align: right;
+  font-size: 16px;
+}
+
+.cart-checkout {
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px;
+  background: #24323f;
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.cart-checkout:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Order detail */
+.order-detail {
+  margin-top: 16px;
+  padding: 14px;
+  background: #f4f8ff;
+  border: 1px solid #dce7f7;
+  border-radius: 8px;
+}
+
+.order-detail h3 {
+  margin: 0 0 10px;
+}
+
+/* Badge */
+.badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.badge-pending {
+  background: #e9fff0;
+  color: #1a7a36;
+}
+
+.badge-completed {
+  background: #e8f4ff;
+  color: #1a5fa0;
+}
+
+.badge-cancelled {
+  background: #fff0f0;
+  color: #b42525;
+}
+
+/* Loader */
+.loader {
+  width: 24px;
+  height: 24px;
+  border: 3px solid #dce7f7;
+  border-top-color: #24323f;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  margin: 24px auto;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Responsive */
 @media (max-width: 800px) {
   .app-kpis,
   .app-form,
   .filters {
+    grid-template-columns: 1fr;
+  }
+
+  .catalog-layout {
     grid-template-columns: 1fr;
   }
 }
