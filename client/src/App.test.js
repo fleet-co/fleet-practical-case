@@ -1,8 +1,10 @@
-import { render, screen } from '@testing-library/react';
-import App from './App';
+import { render, screen } from "@testing-library/react";
+import App from "./App";
 
-test('renders app title', () => {
+test("renders navigation tabs", () => {
   render(<App />);
-  const titleElement = screen.getByText(/fleet device manager/i);
-  expect(titleElement).toBeInTheDocument();
+  expect(screen.getByText(/employees/i)).toBeInTheDocument();
+  expect(screen.getByText(/devices/i)).toBeInTheDocument();
+  expect(screen.getByText(/catalog/i)).toBeInTheDocument();
+  expect(screen.getByText(/orders/i)).toBeInTheDocument();
 });
