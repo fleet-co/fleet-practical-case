@@ -4,6 +4,8 @@ import { useEmployees } from "../../employees/hooks";
 import { useFilteredDevices } from "../hooks/useFilteredDevices";
 import DeviceForm from "./DeviceForm";
 import DeviceList from "./DeviceList";
+import SelectFilter from "../../../components/SelectFilter";
+import SearchInput from "../../../components/SearchInput";
 
 export default function DevicesPage() {
   const [typeFilter, setTypeFilter] = useState("");
@@ -26,34 +28,9 @@ export default function DevicesPage() {
 
       <h3>Filters</h3>
       <div className="filters">
-        <label>
-          Type filter
-          <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
-            <option value="">All</option>
-            {typeOptions.map((type) => (
-              <option key={type} value={type}>{type}</option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Owner filter
-          <select value={ownerFilter} onChange={(e) => setOwnerFilter(e.target.value)}>
-            <option value="">All</option>
-            {employees.map((employee) => (
-              <option key={employee.id} value={employee.id}>
-                {employee.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Search
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search name / type"
-          />
-        </label>
+        <SelectFilter label="Type filter" value={typeFilter} onChange={setTypeFilter} options={typeOptions} />
+        <SelectFilter label="Owner filter" value={ownerFilter} onChange={setOwnerFilter} options={employees.map((e) => ({ value: String(e.id), label: e.name }))} />
+        <SearchInput value={search} onChange={setSearch} placeholder="Search name / type" />
       </div>
 
       <DeviceList

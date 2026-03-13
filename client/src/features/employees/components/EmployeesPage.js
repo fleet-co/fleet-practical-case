@@ -3,6 +3,8 @@ import { useEmployees } from "../hooks";
 import { useFilteredEmployees } from "../hooks/useFilteredEmployees";
 import EmployeeForm from "./EmployeeForm";
 import EmployeeList from "./EmployeeList";
+import SelectFilter from "../../../components/SelectFilter";
+import SearchInput from "../../../components/SearchInput";
 
 export default function EmployeesPage() {
   const [roleFilter, setRoleFilter] = useState("");
@@ -23,23 +25,8 @@ export default function EmployeesPage() {
 
       <h3>Filters</h3>
       <div className="filters">
-        <label>
-          Role filter
-          <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
-            <option value="">All</option>
-            {roleOptions.map((role) => (
-              <option key={role} value={role}>{role}</option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Search
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search name / role"
-          />
-        </label>
+        <SelectFilter label="Role filter" value={roleFilter} onChange={setRoleFilter} options={roleOptions} />
+        <SearchInput value={search} onChange={setSearch} placeholder="Search name / role" />
       </div>
 
       <EmployeeList

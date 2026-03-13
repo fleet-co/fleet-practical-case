@@ -5,6 +5,8 @@ import { useAddToCart } from "../../cart/hooks";
 import ProductForm from "./ProductForm";
 import CartSidebar from "../../cart/components/CartSidebar";
 import DataTable from "../../../components/DataTable";
+import SelectFilter from "../../../components/SelectFilter";
+import SearchInput from "../../../components/SearchInput";
 
 const COLUMNS = ["Name", "Category", "Price", "Stock", "Actions"];
 
@@ -35,23 +37,8 @@ export default function CatalogPage() {
 
         <h3>Filters</h3>
         <div className="filters">
-          <label>
-            Category
-            <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
-              <option value="">All</option>
-              {categories.map((cat) => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Search
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search products"
-            />
-          </label>
+          <SelectFilter label="Category" value={categoryFilter} onChange={setCategoryFilter} options={categories} />
+          <SearchInput value={search} onChange={setSearch} placeholder="Search products" />
         </div>
 
         <h3>Products</h3>
